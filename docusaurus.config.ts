@@ -6,7 +6,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: '山商方块嘉年华',
-  tagline: 'welcome to sdtbu club party!',
+  tagline: '七个社团，一张方块校园',
   favicon: 'img/favicon.ico',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
@@ -83,12 +83,12 @@ const config: Config = {
       items: [
         {
           type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
+          sidebarId: 'mainSidebar',
           position: 'left',
-          label: 'Tutorial',
+          label: '活动说明',
         },
-        {to: '/blog', label: 'Blog', position: 'left'},
-        {to: '/showcase', label: '组件展示', position: 'left'},
+        {to: '/docs/clubs', label: '社团风采', position: 'left'},
+        {to: '/blog', label: '活动日志', position: 'left'},
         {
           href: 'https://github.com/MyGOClubParty/',
           label: 'GitHub',
@@ -100,38 +100,67 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Docs',
+          title: '活动',
           items: [
             {
-              label: 'Tutorial',
+              label: '活动总览',
               to: '/docs/intro',
             },
-          ],
-        },
-        {
-          title: 'Community',
-          items: [
             {
-              label: 'Stack Overflow',
-              href: 'https://stackoverflow.com/questions/tagged/docusaurus',
+              label: '活动流程',
+              to: '/docs/activity/process',
             },
             {
-              label: 'Discord',
-              href: 'https://discordapp.com/invite/docusaurus',
-            },
-            {
-              label: 'X',
-              href: 'https://x.com/docusaurus',
+              label: '奖项设置',
+              to: '/docs/activity/awards',
             },
           ],
         },
         {
-          title: 'More',
+          title: '社团',
           items: [
             {
-              label: 'Blog',
-              to: '/blog',
+              label: '社团一览',
+              to: '/docs/clubs',
             },
+            {
+              label: '山商MC煤炭社',
+              to: '/docs/clubs/mc-coal',
+            },
+            {
+              label: '电脑技术协会',
+              to: '/docs/clubs/computer-tech',
+            },
+          ],
+        },
+        {
+          title: '参与单位',
+          items: [
+            {
+              label: 'X动漫联盟协会',
+              to: '/docs/clubs/x-anime',
+            },
+            {
+              label: '摄影协会',
+              to: '/docs/clubs/photography',
+            },
+            {
+              label: '516轮滑协会',
+              to: '/docs/clubs/skate-516',
+            },
+            {
+              label: '轩辕文学社',
+              to: '/docs/clubs/xuanyuan-literature',
+            },
+            {
+              label: '魔术社',
+              to: '/docs/clubs/magic',
+            },
+          ],
+        },
+        {
+          title: '关于',
+          items: [
             {
               label: 'GitHub',
               href: 'https://github.com/MyGOClubParty/club-party-website',
@@ -139,7 +168,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} 山商方块嘉年华, Inc. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} 山商方块嘉年华 · 山商MC煤炭社 主办`,
     },
     prism: {
       theme: prismThemes.github,

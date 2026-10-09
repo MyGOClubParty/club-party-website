@@ -1,0 +1,8 @@
+{
+  "label": "社团风采",
+  "position": 3,
+  "link": {
+    "type": "doc",
+    "id": "clubs/index"
+  }
+}

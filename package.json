@@ -5,6 +5,7 @@
   "scripts": {
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
+    "prebuild": "node scripts/check-md-residue.mjs",
     "build": "docusaurus build",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
@@ -12,7 +13,9 @@
     "serve": "docusaurus serve",
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "check:md": "node scripts/check-md-residue.mjs",
+    "gen:clubs": "node scripts/gen-club-placeholders.mjs && node scripts/gen-club-docs.mjs"
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",

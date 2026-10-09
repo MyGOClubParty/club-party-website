@@ -1,23 +1,13 @@
-import {useCallback, useState, type ReactNode} from 'react';
+import type {ReactNode} from 'react';
 import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
-import {
-  Button,
-  ButtonGroup,
-  Checkbox,
-  DropdownMenu,
-  FlexBox,
-  Input,
-  Select,
-  Slider,
-  Switch,
-  Tag,
-  Tooltip,
-} from '@iicemeta/minecraft-react-ui';
+import {Button, FlexBox, Tag, Tooltip} from '@iicemeta/minecraft-react-ui';
 
+import ClubShowcaseSection from '@site/src/components/ClubShowcaseSection';
+import {activity} from '@site/src/data/clubs';
 import styles from './index.module.css';
 
 /** Minecraft 风格的像素标题 */
@@ -25,129 +15,84 @@ function MinecraftTitle({children}: {children: ReactNode}) {
   return <span className={styles.minecraftFont}>{children}</span>;
 }
 
+/**
+ * 平滑滚动到社团风采区。
+ * 这里用按钮而不是 `<a href="#clubs">`：首页是 React 页面，Docusaurus 的
+ * broken-anchor 检查拿不到 React 页面的锚点元数据，会把它当成坏链误报。
+ */
+function scrollToClubs() {
+  document.getElementById('clubs')?.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+/** 活动关键信息，hero 里的紧凑事实条 */
+const FACTS = [
+  {label: '报名 / 领客户端', value: '10.17 08:00 – 10.19 15:00'},
+  {label: '服务器开放 / 打卡', value: '10.19 18:00 – 10.25 21:00'},
+  {label: '形式', value: '线上开展'},
+];
+
 function HomepageHeader() {
   const {siteConfig} = useDocusaurusContext();
   return (
-    <header className={clsx('hero hero--primary', styles.heroBanner)}>
+    <header className={clsx('hero', styles.heroBanner)}>
       <div className="container">
-        <FlexBox justify="center" align="center" style={{gap: 12, marginBottom: 8}}>
+        <FlexBox align="center" justify="center" style={{gap: 12, marginBottom: 10, flexWrap: 'wrap'}}>
+          <img className={styles.schoolLogo} src={activity.schoolLogo} alt={activity.school} />
           <Tag className="Tag_success">多社团联合</Tag>
+          <Tag>{activity.clubCount} 个社团</Tag>
           <Tag>2026</Tag>
         </FlexBox>
-        <Heading as="h1" className="hero__title">
+
+        <Heading as="h1" className={clsx('hero__title', styles.title)}>
           <MinecraftTitle>{siteConfig.title}</MinecraftTitle>
         </Heading>
-        <p className="hero__subtitle">{siteConfig.tagline}</p>
+
+        <p className={styles.subtitle}>{activity.fullName}</p>
+
+        <p className={styles.lead}>
+          依托“元山商”校园还原工程搭建的线上虚拟校园，七个学生社团在同一张 Minecraft
+          地图里各设展位。下载客户端、连上服务器，在方块校园里逛社团、完成互动并拍照打卡。
+        </p>
+
         <div className={styles.buttons}>
           <Link className={styles.mcLink} to="/docs/intro">
-            <Button variant="primary">活动指南</Button>
+            <Button variant="primary">活动说明</Button>
           </Link>
-          <Link className={styles.mcLink} to="/showcase">
-            <Tooltip content="看看这套 Minecraft UI 都有什么" placement="bottom">
-              <Button variant="secondary">组件展示</Button>
-            </Tooltip>
-          </Link>
+          <Tooltip content="每个社团都有独立展位" placement="bottom">
+            <Button variant="secondary" onClick={scrollToClubs}>
+              社团风采
+            </Button>
+          </Tooltip>
         </div>
+
+        <dl className={styles.facts}>
+          {FACTS.map((f) => (
+            <div key={f.label} className={styles.fact}>
+              <dt>{f.label}</dt>
+              <dd>{f.value}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
     </header>
   );
 }
 
-/** 用 minecraft-react-ui 搭建的互动试玩区，验证组件库在 Docusaurus 中可用 */
-function McPlayground() {
-  const [view, setView] = useState('join');
-  const [nickname, setNickname] = useState('');
-  const [material, setMaterial] = useState<string | undefined>();
-  const [agree, setAgree] = useState(false);
-  const [notify, setNotify] = useState(true);
-  const [volume, setVolume] = useState(80);
-
-  const onSubmit = useCallback(() => {
-    alert(nickname ? `欢迎加入，${nickname}！` : '请先输入游戏昵称');
-  }, [nickname]);
-
-  return (
-    <section className={styles.playground}>
-      <div className="container">
-        <Heading as="h2" className={styles.playgroundTitle}>
-          <MinecraftTitle>互动试玩台</MinecraftTitle>
-        </Heading>
-        <p className={styles.playgroundDesc}>
-          本页交互组件由 <code>@iicemeta/minecraft-react-ui</code> 驱动，快来试一试。
-        </p>
-        <div className={styles.playgroundPanel}>
-          <FlexBox direction="col" style={{gap: 20, width: '100%', maxWidth: 560}}>
-            <ButtonGroup
-              value={view}
-              onChange={setView}
-              options={[
-                {value: 'join', label: '报名'},
-                {value: 'info', label: '须知'},
-                {value: 'map', label: '地图'},
-              ]}
-            />
-            <Input
-              value={nickname}
-              onChange={setNickname}
-              placeholder="输入你的游戏昵称..."
-            />
-            <Select
-              value={material}
-              onChange={setMaterial}
-              placeholder="选择你擅长的方块材料..."
-              searchPlaceholder="搜索材料..."
-              options={[
-                {label: '橡木木板', value: 'oak_planks'},
-                {label: '石砖', value: 'stone_bricks'},
-                {label: '下界砖', value: 'nether_brick'},
-                {label: '末地石', value: 'end_stone'},
-              ]}
-            />
-            <FlexBox align="center" style={{gap: 12, width: '100%'}}>
-              <Slider value={volume} min={0} max={100} onChange={setVolume} />
-              <Tag>{volume}%</Tag>
-            </FlexBox>
-            <FlexBox align="center" justify="space-between" style={{width: '100%'}}>
-              <FlexBox align="center" style={{gap: 8}}>
-                <Checkbox value={agree} onChange={setAgree} />
-                <span>我已阅读活动须知</span>
-              </FlexBox>
-              <FlexBox align="center" style={{gap: 8}}>
-                <Switch value={notify} onChange={setNotify} />
-                <span>{notify ? '接收活动通知' : '免打扰'}</span>
-              </FlexBox>
-            </FlexBox>
-            <FlexBox align="center" justify="space-between" style={{width: '100%'}}>
-              <Tooltip content={agree ? '点我提交！' : '请先勾选活动须知'} placement="top">
-                <Button variant="primary" active={agree} onClick={onSubmit}>
-                  提交报名
-                </Button>
-              </Tooltip>
-              <DropdownMenu
-                placement="bottom-end"
-                items={[
-                  {id: 'rules', label: '查看规则'},
-                  {id: 'qq', label: '加入 QQ 群'},
-                  {id: 'contact', label: '联系主办方', disabled: false},
-                ]}
-              />
-            </FlexBox>
-          </FlexBox>
-        </div>
-      </div>
-    </section>
-  );
+/** 用草方块贴图铺一条像素分隔带，衔接 hero 与社团区 */
+function BlockDivider() {
+  return <div className={styles.blockDivider} role="presentation" />;
 }
 
 export default function Home(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title={`Hello from ${siteConfig.title}`}
-      description="Description will go into a meta tag in <head />">
+      title={siteConfig.title}
+      description={`${activity.fullName}：${activity.clubCount} 个学生社团联合举办的 Minecraft 校园联谊活动。`}>
       <HomepageHeader />
+      <BlockDivider />
       <main>
-        <McPlayground />
+        <ClubShowcaseSection />
       </main>
     </Layout>
   );

@@ -1,0 +1,134 @@
+{
+  "$comment": "方块嘉年华 各社团风采数据（单一数据源）。scripts/gen-club-placeholders.mjs 依据本文件生成占位图；社团发来真实图片后，只需把下面的路径改成真实文件名并把图片放进 static 对应目录即可，组件无需改动。",
+  "activity": {
+    "name": "方块嘉年华",
+    "fullName": "山商MC煤炭社2026年第一期“方块嘉年华”校园联谊",
+    "clubCount": 7,
+    "school": "山东工商学院",
+    "schoolLogo": "/img/sdtbu-logo.png"
+  },
+  "clubs": [
+    {
+      "slug": "mc-coal",
+      "name": "山商MC煤炭社",
+      "abbr": "MC",
+      "role": "host",
+      "roleLabel": "主办单位",
+      "accent": "#3b8526",
+      "project": "元山商校园展示",
+      "summary": "活动主办方。负责活动服务器搭建、元山商校园还原工程场景部署、客户端整合与联机测试，并明确服务器地址、开放时间与连接方法。",
+      "tags": ["元山商", "校园还原", "服务器"],
+      "logo": "/img/clubs/mc-coal/logo.svg",
+      "cover": "/img/clubs/mc-coal/cover.svg",
+      "images": [
+        "/img/clubs/mc-coal/shot-1.svg",
+        "/img/clubs/mc-coal/shot-2.svg",
+        "/img/clubs/mc-coal/shot-3.svg"
+      ],
+      "doc": "/docs/clubs/mc-coal"
+    },
+    {
+      "slug": "computer-tech",
+      "name": "电脑技术协会",
+      "abbr": "PC",
+      "role": "organizer",
+      "roleLabel": "承办单位",
+      "accent": "#2e6be5",
+      "project": "展示项目待定",
+      "summary": "活动承办方。搭建并测试活动官方平台，提供报名信息填写、客户端压缩包领取、活动说明查看与打卡图片上传功能，并负责教程制作与平台审核。",
+      "tags": ["官方平台", "技术支持", "客户端教程"],
+      "logo": "/img/clubs/computer-tech/logo.svg",
+      "cover": "/img/clubs/computer-tech/cover.svg",
+      "images": [
+        "/img/clubs/computer-tech/shot-1.svg",
+        "/img/clubs/computer-tech/shot-2.svg"
+      ],
+      "doc": "/docs/clubs/computer-tech"
+    },
+    {
+      "slug": "x-anime",
+      "name": "X动漫联盟协会",
+      "abbr": "X",
+      "role": "organizer",
+      "roleLabel": "承办单位",
+      "accent": "#c94f9c",
+      "project": "展示项目待定",
+      "summary": "活动承办方。结合社团自身特色设计服务器内展示区域与互动项目，并提前完成内容审核、场景布置、任务说明及打卡点设置。",
+      "tags": ["动漫", "展示区域", "互动项目"],
+      "logo": "/img/clubs/x-anime/logo.svg",
+      "cover": "/img/clubs/x-anime/cover.svg",
+      "images": [
+        "/img/clubs/x-anime/shot-1.svg",
+        "/img/clubs/x-anime/shot-2.svg"
+      ],
+      "doc": "/docs/clubs/x-anime"
+    },
+    {
+      "slug": "photography",
+      "name": "摄影协会",
+      "abbr": "PH",
+      "role": "co-organizer",
+      "roleLabel": "协办单位",
+      "accent": "#0f8a83",
+      "project": "展示项目待定",
+      "summary": "活动协办方。参与社团展示区域与互动项目设计，协同开展活动宣传，并参与优秀打卡图片的遴选工作。",
+      "tags": ["摄影", "打卡", "作品遴选"],
+      "logo": "/img/clubs/photography/logo.svg",
+      "cover": "/img/clubs/photography/cover.svg",
+      "images": [
+        "/img/clubs/photography/shot-1.svg",
+        "/img/clubs/photography/shot-2.svg",
+        "/img/clubs/photography/shot-3.svg"
+      ],
+      "doc": "/docs/clubs/photography"
+    },
+    {
+      "slug": "skate-516",
+      "name": "516轮滑协会",
+      "abbr": "516",
+      "role": "co-organizer",
+      "roleLabel": "协办单位",
+      "accent": "#d98216",
+      "project": "展示项目待定",
+      "summary": "活动协办方。参与社团展示区域与互动项目设计，协办本次校园联谊二课活动并共同开展活动宣传。",
+      "tags": ["轮滑", "展示区域"],
+      "logo": "/img/clubs/skate-516/logo.svg",
+      "cover": "/img/clubs/skate-516/cover.svg",
+      "images": ["/img/clubs/skate-516/shot-1.svg"],
+      "doc": "/docs/clubs/skate-516"
+    },
+    {
+      "slug": "xuanyuan-literature",
+      "name": "轩辕文学社",
+      "abbr": "文",
+      "role": "co-organizer",
+      "roleLabel": "协办单位",
+      "accent": "#8c5a2b",
+      "project": "展示项目待定",
+      "summary": "活动协办方。参与社团展示区域与互动项目设计，协办本次校园联谊二课活动并共同开展活动宣传。",
+      "tags": ["文学", "展示区域"],
+      "logo": "/img/clubs/xuanyuan-literature/logo.svg",
+      "cover": "/img/clubs/xuanyuan-literature/cover.svg",
+      "images": [
+        "/img/clubs/xuanyuan-literature/shot-1.svg",
+        "/img/clubs/xuanyuan-literature/shot-2.svg"
+      ],
+      "doc": "/docs/clubs/xuanyuan-literature"
+    },
+    {
+      "slug": "magic",
+      "name": "魔术社",
+      "abbr": "魔",
+      "role": "co-organizer",
+      "roleLabel": "协办单位",
+      "accent": "#7b2ff7",
+      "project": "展示项目待定",
+      "summary": "活动协办方。参与社团展示区域与互动项目设计，协办本次校园联谊二课活动并共同开展活动宣传。",
+      "tags": ["魔术", "展示区域"],
+      "logo": "/img/clubs/magic/logo.svg",
+      "cover": "/img/clubs/magic/cover.svg",
+      "images": ["/img/clubs/magic/shot-1.svg"],
+      "doc": "/docs/clubs/magic"
+    }
+  ]
+}

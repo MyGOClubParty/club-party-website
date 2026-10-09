@@ -4,16 +4,52 @@
  */
 
 .heroBanner {
-  padding: 4rem 0;
-  text-align: center;
   position: relative;
+  padding: 3.5rem 0 2.5rem;
+  text-align: center;
   overflow: hidden;
+  /* 草方块贴图平铺 + 暗化，保证浅色/深色主题下文字都够对比 */
+  background-image: linear-gradient(rgba(14, 16, 18, 0.82), rgba(14, 16, 18, 0.9)),
+    url('/mc/blocks/grass_block_side.png');
+  background-size: auto, 56px 56px;
+  background-repeat: repeat, repeat;
+  image-rendering: pixelated;
+  color: #fff;
 }
 
-@media screen and (max-width: 996px) {
-  .heroBanner {
-    padding: 2rem;
-  }
+.schoolLogo {
+  height: 34px;
+  width: auto;
+  padding: 3px 6px;
+  background: rgba(255, 255, 255, 0.92);
+  display: block;
+}
+
+.title {
+  margin: 0.5rem 0 0.25rem;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  color: #fff;
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.55);
+}
+
+.minecraftFont {
+  font-family: Minecraft, Minercraftory, sans-serif;
+  letter-spacing: 0.03em;
+}
+
+.subtitle {
+  margin: 0 auto 0.75rem;
+  max-width: 52rem;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.lead {
+  margin: 0 auto 1.5rem;
+  max-width: 46rem;
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .buttons {
@@ -21,6 +57,7 @@
   align-items: center;
   justify-content: center;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 /* MC 组件按钮不能被 Link 下划线/颜色污染 */
@@ -32,33 +69,56 @@
   text-decoration: none;
 }
 
-.minecraftFont {
-  font-family: Minecraft, Minercraftory, sans-serif;
-  letter-spacing: 0.02em;
-}
-
-.playground {
-  padding: 3rem 0;
-}
-
-.playgroundTitle {
-  text-align: center;
-  margin-bottom: 0.5rem;
-}
-
-.playgroundDesc {
-  text-align: center;
-  margin-bottom: 1.5rem;
-  opacity: 0.75;
-}
-
-.playgroundPanel {
+.facts {
   display: flex;
   justify-content: center;
-  align-items: center;
-  padding: 2rem;
-  border-radius: 12px;
-  background: var(--background-color, #23232a);
-  color: var(--text-color, #fff);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  gap: 0;
+  flex-wrap: wrap;
+  margin: 1.75rem auto 0;
+  max-width: 52rem;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.fact {
+  flex: 1 1 190px;
+  padding: 0.65rem 1rem;
+  text-align: center;
+}
+
+.fact + .fact {
+  border-left: 2px solid rgba(255, 255, 255, 0.18);
+}
+
+.fact dt {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.fact dd {
+  margin: 0.2rem 0 0;
+  font-family: Minecraft, Minercraftory, sans-serif;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.blockDivider {
+  height: 34px;
+  background-image: url('/mc/blocks/grass_block_side.png');
+  background-size: 34px 34px;
+  background-repeat: repeat;
+  image-rendering: pixelated;
+  border-bottom: 3px solid rgba(0, 0, 0, 0.25);
+}
+
+@media screen and (max-width: 996px) {
+  .heroBanner {
+    padding: 2rem 1rem;
+  }
+
+  .fact + .fact {
+    border-left: none;
+    border-top: 2px solid rgba(255, 255, 255, 0.18);
+  }
 }

@@ -1,0 +1,58 @@
+.section {
+  padding: 3rem 0 4rem;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.title {
+  margin: 0 0 0.5rem;
+  font-family: Minecraft, Minercraftory, sans-serif;
+  font-size: 1.9rem;
+  letter-spacing: 0.03em;
+  color: var(--ifm-heading-color);
+}
+
+.desc {
+  max-width: 46rem;
+  margin: 0 auto 1rem;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--ifm-font-color-base);
+  opacity: 0.85;
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.hint {
+  font-family: Minecraft, Minercraftory, sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--ifm-font-color-base);
+  opacity: 0.6;
+}
+
+.grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  align-items: start;
+}
+
+@media screen and (max-width: 996px) {
+  .section {
+    padding: 2rem 0 3rem;
+  }
+
+  .title {
+    font-size: 1.5rem;
+  }
+}

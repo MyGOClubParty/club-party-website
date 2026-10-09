@@ -1,0 +1,64 @@
+---
+title: 社团一览
+sidebar_label: 社团一览
+sidebar_position: 0
+slug: /clubs
+description: 方块嘉年华七个参与社团的角色与展示项目
+---
+
+import {clubs} from '@site/src/data/clubs';
+
+# 社团一览
+
+本次活动共 **{clubs.length} 个社团**参与，分为主办、承办、协办三类角色。各社团的展示区域都在同一张
+“元山商”Minecraft 地图内，参与者可自主选择至少一项完成。
+
+:::info[首页顺序是随机的]
+首页的社团卡片**每次进入都会重新随机排列**，因此这里按角色与报名顺序列出，与首页展示顺序无关。
+:::
+
+<table>
+  <thead>
+    <tr>
+      <th>社团</th>
+      <th>角色</th>
+      <th>服务器内展示项目</th>
+      <th>详细介绍</th>
+    </tr>
+  </thead>
+  <tbody>
+    {clubs.map((club) => (
+      <tr key={club.slug}>
+        <td>
+          <img
+            src={club.logo}
+            alt=""
+            width="24"
+            height="24"
+            style={{verticalAlign: 'middle', marginRight: 6, imageRendering: 'pixelated'}}
+          />
+          {club.name}
+        </td>
+        <td>{club.roleLabel}</td>
+        <td>{club.project}</td>
+        <td>
+          <a href={club.doc}>查看</a>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
+## 各社团分工概览
+
+{clubs.map((club) => (
+  <div key={club.slug} style={{marginBottom: '1rem'}}>
+    <h3 style={{marginBottom: '0.25rem'}}>{club.name}</h3>
+    <p style={{margin: 0}}>{club.summary}</p>
+  </div>
+))}
+
+## 相关页面
+
+- [活动涉及单位](/docs/activity/organizers)
+- [活动流程](/docs/activity/process)

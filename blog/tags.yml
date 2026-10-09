@@ -1,19 +1,19 @@
-facebook:
-  label: Facebook
-  permalink: /facebook
-  description: Facebook tag description
+announcement:
+  label: 活动公告
+  permalink: /announcement
+  description: 方块嘉年华的公告与重要通知
 
-hello:
-  label: Hello
-  permalink: /hello
-  description: Hello tag description
+minecraft:
+  label: Minecraft
+  permalink: /minecraft
+  description: 与活动服务器、客户端相关的内容
 
-docusaurus:
-  label: Docusaurus
-  permalink: /docusaurus
-  description: Docusaurus tag description
+clubs:
+  label: 社团
+  permalink: /clubs
+  description: 参与社团与展示项目
 
-hola:
-  label: Hola
-  permalink: /hola
-  description: Hola tag description
+guide:
+  label: 参与指南
+  permalink: /guide
+  description: 报名、连接、打卡等操作指引
