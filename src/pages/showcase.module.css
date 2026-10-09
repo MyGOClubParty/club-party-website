@@ -1,0 +1,12 @@
+.section {
+  margin-bottom: 2rem;
+}
+
+/* MC 组件默认为深色主题设计，面板统一用库的背景变量保持观感一致 */
+.panel {
+  padding: 1.5rem;
+  border-radius: 12px;
+  background: var(--background-color, #23232a);
+  color: var(--text-color, #fff);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}

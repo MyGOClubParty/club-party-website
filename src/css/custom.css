@@ -1,8 +1,44 @@
+/* minecraft-react-ui: all component styles + Minecraft CSS variables. */
+@import '@iicemeta/minecraft-react-ui/style.css';
+/* Minecraft pixel font used by the library components. */
+@import url('https://fonts.cdnfonts.com/css/minercraftory');
+
 /**
  * Any CSS included here will be global. The classic template
  * bundles Infima by default. Infima is a CSS framework designed to
  * work well for content-centric websites.
  */
+
+/*
+ * minecraft-react-ui compat shims.
+ *
+ * 1. The library sets `html { color: var(--text-color) }` (#fff) and its CSS
+ *    lands after Infima in the bundle, painting all site text white.
+ *    Re-assert Infima's body-level text color after the library import.
+ * 2. The library's FlexBox.css ships no `.FlexBox_col` / `.FlexBox_row` /
+ *    `.FlexBox_wrap_*` rules, so `direction="col"` renders as a row.
+ *    Library bug tracked for fix upstream in @iicemeta/minecraft-react-ui;
+ *    shim here until a patched version is published.
+ */
+body {
+  color: var(--ifm-font-color-base);
+}
+
+.FlexBox_row {
+  flex-direction: row;
+}
+
+.FlexBox_col {
+  flex-direction: column;
+}
+
+.FlexBox_wrap_wrap {
+  flex-wrap: wrap;
+}
+
+.FlexBox_wrap_nowrap {
+  flex-wrap: nowrap;
+}
 
 /* You can override the default Infima variables here. */
 :root {

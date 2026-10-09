@@ -88,6 +88,7 @@ const config: Config = {
           label: 'Tutorial',
         },
         {to: '/blog', label: 'Blog', position: 'left'},
+        {to: '/showcase', label: '组件展示', position: 'left'},
         {
           href: 'https://github.com/MyGOClubParty/',
           label: 'GitHub',
