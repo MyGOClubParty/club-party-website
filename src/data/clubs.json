@@ -37,12 +37,9 @@
       "project": "展示项目待定",
       "summary": "活动承办方。搭建并测试活动官方平台，提供报名信息填写、客户端压缩包领取、活动说明查看与打卡图片上传功能，并负责教程制作与平台审核。",
       "tags": ["官方平台", "技术支持", "客户端教程"],
-      "logo": "/img/clubs/computer-tech/logo.svg",
-      "cover": "/img/clubs/computer-tech/cover.svg",
-      "images": [
-        "/img/clubs/computer-tech/shot-1.svg",
-        "/img/clubs/computer-tech/shot-2.svg"
-      ],
+      "logo": "/img/clubs/computer-tech/logo.jpg",
+      "cover": "/img/clubs/computer-tech/shot-1.jpg",
+      "images": ["/img/clubs/computer-tech/shot-1.jpg"],
       "doc": "/docs/clubs/computer-tech"
     },
     {
@@ -92,9 +89,12 @@
       "project": "展示项目待定",
       "summary": "活动协办方。参与社团展示区域与互动项目设计，协办本次校园联谊二课活动并共同开展活动宣传。",
       "tags": ["轮滑", "展示区域"],
-      "logo": "/img/clubs/skate-516/logo.svg",
-      "cover": "/img/clubs/skate-516/cover.svg",
-      "images": ["/img/clubs/skate-516/shot-1.svg"],
+      "logo": "/img/clubs/skate-516/logo.jpg",
+      "cover": "/img/clubs/skate-516/shot-1.jpg",
+      "images": [
+        "/img/clubs/skate-516/shot-1.jpg",
+        "/img/clubs/skate-516/shot-2.jpg"
+      ],
       "doc": "/docs/clubs/skate-516"
     },
     {

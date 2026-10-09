@@ -27,13 +27,24 @@ const ROLE_NOTE = {
 };
 
 function render(club, position) {
-  const images = club.images ?? [];
-  const gallery =
-    images.length > 0
-      ? images
-          .map((src, i) => `![${club.name} 风采占位图 ${i + 1}](${src})`)
-          .join('\n\n')
-      : `![${club.name} 封面占位图](${club.cover})`;
+  const images = club.images?.length ? club.images : [club.cover];
+  // 只要还有一张占位 svg，就保留「图片待补」提示；全部换成真实照片后提示自动消失。
+  const pending = images.filter((src) => src.endsWith('.svg'));
+
+  const gallery = images
+    .map((src, i) => `![${club.name} ${src.endsWith('.svg') ? '风采占位图' : '风采图'} ${i + 1}](${src})`)
+    .join('\n\n');
+
+  const note =
+    pending.length > 0
+      ? `:::info[${pending.length === images.length ? '图片待补' : '部分图片待补'}]
+${pending.length === images.length ? '下列为**占位图**' : `下列有 ${pending.length} 张为**占位图**`}，用于确认版面与图片数量。社团正式提交素材后，把图片放进
+\`static/img/clubs/${club.slug}/\` 并在 \`src/data/clubs.json\` 里把路径改成真实文件名即可，
+首页卡片与本文档会自动更新。
+:::
+
+`
+      : '';
 
   return `---
 title: ${club.name}
@@ -62,13 +73,7 @@ ${ROLE_NOTE[club.role]}。${club.summary.replace(/^[^。]*。/, '')}
 
 ## 风采展示
 
-:::info[图片待补]
-下列为**占位图**，用于确认版面与图片数量。社团正式提交素材后，把图片放进
-\`static/img/clubs/${club.slug}/\` 并在 \`src/data/clubs.json\` 里把路径改成真实文件名即可，
-首页卡片与本文档会自动更新。
-:::
-
-${gallery}
+${note}${gallery}
 
 ## 相关页面
 

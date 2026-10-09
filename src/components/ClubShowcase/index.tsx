@@ -20,6 +20,8 @@ export interface ClubShowcaseProps {
  * - 图片：`images` 有 n 张时自动出现画廊（缩略图 + 上/下一张）；只有 1 张时退化为单图，不显示缩略图条；
  *   一张都没有时回落到 `cover`。新增/删除图片只需改 `src/data/clubs.json`。
  * - 占位图：路径以 `.svg` 结尾时自动挂「占位图」角标，换成真实照片（.jpg/.png）后角标自动消失。
+ * - 缩放：[`styles.pixelated`] 只在占位 svg 上启用（`image-rendering: pixelated`，保住像素画的硬边）；
+ *   真实照片走浏览器默认的平滑缩放。logo 一律 `object-fit: contain`，因为社团 logo 未必是正方形。
  */
 export default function ClubShowcase({club, order, total}: ClubShowcaseProps): ReactNode {
   const gallery = galleryOf(club);
@@ -34,6 +36,7 @@ export default function ClubShowcase({club, order, total}: ClubShowcaseProps): R
 
   const current = gallery[Math.min(active, gallery.length - 1)];
   const isPlaceholder = current.endsWith('.svg');
+  const logoIsPlaceholder = club.logo.endsWith('.svg');
   const hasGallery = gallery.length > 1;
 
   const step = (delta: number) => {
@@ -48,7 +51,13 @@ export default function ClubShowcase({club, order, total}: ClubShowcaseProps): R
     >
       <header className={styles.head}>
         <div className={styles.logoBox}>
-          <img className={styles.logo} src={club.logo} alt={`${club.name} logo`} width={48} height={48} />
+          <img
+            className={clsx(styles.logo, logoIsPlaceholder && styles.pixelated)}
+            src={club.logo}
+            alt={`${club.name} logo`}
+            width={48}
+            height={48}
+          />
         </div>
         <div className={styles.headText}>
           <FlexBox align="center" style={{gap: 8, flexWrap: 'wrap'}}>
@@ -68,7 +77,7 @@ export default function ClubShowcase({club, order, total}: ClubShowcaseProps): R
       <figure className={styles.figure}>
         <div className={styles.frame}>
           <img
-            className={styles.cover}
+            className={clsx(styles.cover, isPlaceholder && styles.pixelated)}
             data-cover
             src={current}
             alt={`${club.name} 风采图 ${active + 1}`}
@@ -105,7 +114,13 @@ export default function ClubShowcase({club, order, total}: ClubShowcaseProps): R
                 data-thumb={i}
                 onClick={() => setActive(i)}
               >
-                <img src={src} alt="" loading="lazy" decoding="async" />
+                <img
+                  className={clsx(src.endsWith('.svg') && styles.pixelated)}
+                  src={src}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
               </button>
             ))}
           </div>

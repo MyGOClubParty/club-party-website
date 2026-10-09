@@ -59,6 +59,13 @@
   width: 100%;
   height: 100%;
   display: block;
+  /* 社团真实 logo 未必是正方形（516 的是 1.16:1），contain 才不会拉变形 */
+  object-fit: contain;
+}
+
+/* 只在「像素画素材」上启用硬边放大：占位 SVG 与自绘方块贴图。
+   社团发来的真实照片走浏览器默认的平滑缩放，否则人像会被打成马赛克。 */
+.pixelated {
   image-rendering: pixelated;
 }
 
@@ -130,7 +137,6 @@
   height: 100%;
   display: block;
   object-fit: cover;
-  image-rendering: pixelated;
 }
 
 .phBadge {
@@ -209,7 +215,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  image-rendering: pixelated;
 }
 
 .thumb:hover {
