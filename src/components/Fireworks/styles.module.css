@@ -1,0 +1,12 @@
+/* 盖在 hero 上的烟花画布：只负责画，不接收指针事件，
+   否则 hero 里的按钮和文字选中都会被它挡住。 */
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  /* 上面还有 hero 的文字，别让它参与堆叠顺序的判断 */
+  z-index: 0;
+}

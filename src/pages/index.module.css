@@ -5,7 +5,8 @@
 
 .heroBanner {
   position: relative;
-  padding: 3.5rem 0 2.5rem;
+  /* 下内边距要留够：花圃里的花最高 42px，会从下面长进 hero 一小截 */
+  padding: 3.5rem 0 3.5rem;
   text-align: center;
   overflow: hidden;
   /* 草方块贴图平铺 + 暗化，保证浅色/深色主题下文字都够对比 */
@@ -15,6 +16,20 @@
   background-repeat: repeat, repeat;
   image-rendering: pixelated;
   color: #fff;
+  /* 平移正好一个贴图周期（56px），循环处无缝。26s 一圈 ≈ 2px/s，是"在动"而不是"在晃"。 */
+  animation: heroPan 26s linear infinite;
+}
+
+@keyframes heroPan {
+  to {
+    background-position: 0 0, -56px 0;
+  }
+}
+
+/* 烟花 canvas 是 absolute 且 z-index: 0，正文要抬到它上面 */
+.heroInner {
+  position: relative;
+  z-index: 1;
 }
 
 .schoolLogo {
@@ -69,6 +84,15 @@
   text-decoration: none;
 }
 
+/* 「放烟花」按钮里的 TNT 引信图标 */
+.celebrateIcon {
+  height: 16px;
+  width: 16px;
+  margin-right: 6px;
+  vertical-align: -3px;
+  image-rendering: pixelated;
+}
+
 .facts {
   display: flex;
   justify-content: center;
@@ -103,13 +127,54 @@
   color: #fff;
 }
 
-.blockDivider {
-  height: 34px;
-  background-image: url('/mc/blocks/grass_block_side.png');
-  background-size: 34px 34px;
-  background-repeat: repeat;
-  image-rendering: pixelated;
-  border-bottom: 3px solid rgba(0, 0, 0, 0.25);
+/*
+ * 入场动画：hero 里六块内容依次淡入上浮，各带一点延迟做次序感。
+ * 只用 transform/opacity（合成层能跑完），不动布局属性，避免入场时重排。
+ * `both` 让延迟期间保持起始态，不会先闪一下再动。
+ */
+.logoRow,
+.title,
+.subtitle,
+.lead,
+.buttons,
+.facts {
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.logoRow {
+  animation-delay: 0.05s;
+}
+
+.title {
+  animation-delay: 0.12s;
+}
+
+.subtitle {
+  animation-delay: 0.19s;
+}
+
+.lead {
+  animation-delay: 0.26s;
+}
+
+.buttons {
+  animation-delay: 0.33s;
+}
+
+.facts {
+  animation-delay: 0.4s;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media screen and (max-width: 996px) {
@@ -120,5 +185,18 @@
   .fact + .fact {
     border-left: none;
     border-top: 2px solid rgba(255, 255, 255, 0.18);
+  }
+}
+
+/* 系统要求减少动效：入场、草方块流动一律停掉（花圃的摇摆在它自己的样式里处理） */
+@media screen and (prefers-reduced-motion: reduce) {
+  .heroBanner,
+  .logoRow,
+  .title,
+  .subtitle,
+  .lead,
+  .buttons,
+  .facts {
+    animation: none;
   }
 }

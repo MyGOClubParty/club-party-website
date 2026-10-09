@@ -1,0 +1,86 @@
+/* 草方块花圃：34px 草方块带 + 长在带子上的原版小花。
+   替代原来那条纯装饰的 .blockDivider。 */
+.garden {
+  /* 带子高度 = 一格草方块。草色只占 grass_block_side 顶部 4/16 行，
+     所以“地面”在带顶下方约 34*4/16 ≈ 8.5px 处。 */
+  --band: 34px;
+  position: relative;
+  height: var(--band);
+  /* 花要长到带子外面去，竖直方向不能裁 */
+  overflow: visible;
+}
+
+.band {
+  position: absolute;
+  inset: 0;
+  background-image: url('/mc/blocks/grass_block_side.png');
+  background-size: 34px 34px;
+  background-repeat: repeat;
+  image-rendering: pixelated;
+  border-bottom: 3px solid rgba(0, 0, 0, 0.25);
+  /* 线性平移正好一个贴图周期（34px），首尾无缝接上 */
+  animation: bandScroll 14s linear infinite;
+}
+
+@keyframes bandScroll {
+  to {
+    background-position-x: -34px;
+  }
+}
+
+/* 花圃的定位参照系：高度设成 0，下沿对准草色带里 4px
+   —— 花的根部压进草色里一点，才像“种在草里”而不是“浮在带子上”。 */
+.plants {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--band) - 4px);
+  height: 0;
+}
+
+.plant {
+  position: absolute;
+  bottom: 0;
+  /* 夹在带子内侧：22px 是最大花宽的一半，保证旋转时不会顶出视口 */
+  left: clamp(22px, var(--left), calc(100% - 22px));
+  width: var(--size);
+  height: var(--size);
+  /* 用负 margin 做水平居中，把 transform 留给摇摆动画 */
+  margin-left: calc(var(--size) / -2);
+  transform-origin: 50% 100%;
+  animation: sway var(--duration, 5s) ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.plant img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* 16x16 原贴图放大后保住硬边 */
+  image-rendering: pixelated;
+}
+
+@keyframes sway {
+  from {
+    transform: rotate(-3.5deg);
+  }
+
+  to {
+    transform: rotate(3.5deg);
+  }
+}
+
+@media screen and (max-width: 700px) {
+  /* 窄屏隔一棵藏一棵，否则整条带子糊成一片 */
+  .plant:nth-child(even) {
+    display: none;
+  }
+}
+
+/* 系统要求减少动效：花不再晃、草不再流 */
+@media screen and (prefers-reduced-motion: reduce) {
+  .band,
+  .plant {
+    animation: none;
+  }
+}

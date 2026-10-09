@@ -7,6 +7,8 @@ import Heading from '@theme/Heading';
 import {Button, FlexBox, Tag, Tooltip} from '@iicemeta/minecraft-react-ui';
 
 import ClubShowcaseSection from '@site/src/components/ClubShowcaseSection';
+import Fireworks, {useFireworks} from '@site/src/components/Fireworks';
+import GrassGarden from '@site/src/components/GrassGarden';
 import {activity} from '@site/src/data/clubs';
 import styles from './index.module.css';
 
@@ -33,10 +35,19 @@ const FACTS = [
 
 function HomepageHeader() {
   const {siteConfig} = useDocusaurusContext();
+  // canvas 和「放烟花」按钮都在 hero 里，所以把引擎挂在这一层，回调直接传
+  const {canvasRef, launch} = useFireworks();
+
   return (
     <header className={clsx('hero', styles.heroBanner)}>
-      <div className="container">
-        <FlexBox align="center" justify="center" style={{gap: 12, marginBottom: 10, flexWrap: 'wrap'}}>
+      <Fireworks canvasRef={canvasRef} />
+
+      <div className={clsx('container', styles.heroInner)}>
+        <FlexBox
+          className={styles.logoRow}
+          align="center"
+          justify="center"
+          style={{gap: 12, marginBottom: 10, flexWrap: 'wrap'}}>
           <img className={styles.schoolLogo} src={activity.schoolLogo} alt={activity.school} />
           <Tag className="Tag_success">多社团联合</Tag>
           <Tag>{activity.clubCount} 个社团</Tag>
@@ -63,6 +74,12 @@ function HomepageHeader() {
               社团风采
             </Button>
           </Tooltip>
+          <Tooltip content="再放一轮烟花" placement="bottom">
+            <Button variant="secondary" onClick={() => launch(3)}>
+              <img className={styles.celebrateIcon} src="/mc/items/firework_rocket.png" alt="" />
+              放烟花
+            </Button>
+          </Tooltip>
         </div>
 
         <dl className={styles.facts}>
@@ -78,11 +95,6 @@ function HomepageHeader() {
   );
 }
 
-/** 用草方块贴图铺一条像素分隔带，衔接 hero 与社团区 */
-function BlockDivider() {
-  return <div className={styles.blockDivider} role="presentation" />;
-}
-
 export default function Home(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   return (
@@ -90,7 +102,7 @@ export default function Home(): ReactNode {
       title={siteConfig.title}
       description={`${activity.fullName}：${activity.clubCount} 个学生社团联合举办的 Minecraft 校园联谊活动。`}>
       <HomepageHeader />
-      <BlockDivider />
+      <GrassGarden />
       <main>
         <ClubShowcaseSection />
       </main>
