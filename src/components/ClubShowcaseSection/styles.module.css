@@ -44,7 +44,10 @@
   display: grid;
   gap: 1.25rem;
   grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  align-items: start;
+  /* 之前这里是 align-items: start，卡片各自按内容高度收缩，同一行的三张就参差不齐。
+     用默认的 stretch 让同一行的卡片拉齐到最高那张；配合卡片里 .foot 的
+     margin-top: auto，"社团详情" 按钮会贴着底边对齐。 */
+  align-items: stretch;
 }
 
 @media screen and (max-width: 996px) {

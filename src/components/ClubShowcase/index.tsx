@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import {Button, FlexBox, Tag, Tooltip} from '@iicemeta/minecraft-react-ui';
 
+import Lightbox from '@site/src/components/Lightbox';
 import {galleryOf, roleTone, type Club} from '@site/src/data/clubs';
 import styles from './styles.module.css';
 
@@ -22,10 +23,13 @@ export interface ClubShowcaseProps {
  * - 占位图：路径以 `.svg` 结尾时自动挂「占位图」角标，换成真实照片（.jpg/.png）后角标自动消失。
  * - 缩放：[`styles.pixelated`] 只在占位 svg 上启用（`image-rendering: pixelated`，保住像素画的硬边）；
  *   真实照片走浏览器默认的平滑缩放。logo 一律 `object-fit: contain`，因为社团 logo 未必是正方形。
+ * - 灯箱：点主图打开全屏大图（`Lightbox`，portal 到 body）；卡片里的 ‹ › 仍只翻卡内画廊，
+ *   大图里的 ‹ › 翻的是同一份画廊，两边共用 `active`，关掉灯箱后卡片停在最后看的那张。
  */
 export default function ClubShowcase({club, order, total}: ClubShowcaseProps): ReactNode {
   const gallery = galleryOf(club);
   const [active, setActive] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   // 社团数据可能变化（热更新 / 增删图片），越界时回到第一张，避免空白。
   useEffect(() => {
@@ -76,14 +80,24 @@ export default function ClubShowcase({club, order, total}: ClubShowcaseProps): R
 
       <figure className={styles.figure}>
         <div className={styles.frame}>
-          <img
-            className={clsx(styles.cover, isPlaceholder && styles.pixelated)}
-            data-cover
-            src={current}
-            alt={`${club.name} 风采图 ${active + 1}`}
-            loading="lazy"
-            decoding="async"
-          />
+          {/* 主图包一层按钮：既拿到「点图放大」，又能被键盘 Tab 到、回车触发。
+              卡片里的 ‹ › 是它的兄弟节点、位置更靠后，点上去不会误开灯箱。 */}
+          <button
+            type="button"
+            className={styles.zoom}
+            data-zoom
+            onClick={() => setLightboxOpen(true)}
+            aria-label={`放大查看 ${club.name} 风采图 ${active + 1}`}
+          >
+            <img
+              className={clsx(styles.cover, isPlaceholder && styles.pixelated)}
+              data-cover
+              src={current}
+              alt={`${club.name} 风采图 ${active + 1}`}
+              loading="lazy"
+              decoding="async"
+            />
+          </button>
           {isPlaceholder && <span className={styles.phBadge}>占位图</span>}
 
           {hasGallery && (
@@ -99,6 +113,11 @@ export default function ClubShowcase({club, order, total}: ClubShowcaseProps): R
               </span>
             </>
           )}
+
+          {/* 灯箱没有天然的视觉暗示，hover/聚焦时给一句提示 */}
+          <span className={styles.zoomHint} aria-hidden="true">
+            点击放大
+          </span>
         </div>
 
         {hasGallery && (
@@ -144,6 +163,16 @@ export default function ClubShowcase({club, order, total}: ClubShowcaseProps): R
           </Tooltip>
         </Link>
       </footer>
+
+      {lightboxOpen && (
+        <Lightbox
+          images={gallery}
+          index={Math.min(active, gallery.length - 1)}
+          alt={`${club.name} 风采图`}
+          onIndexChange={setActive}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </article>
   );
 }

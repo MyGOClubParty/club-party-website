@@ -1,0 +1,135 @@
+/* 图片灯箱：全屏遮罩 + 居中大图。视觉沿用站点的 MC 深色面板语言。 */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3.5rem 4.5rem;
+  background: rgba(6, 6, 10, 0.88);
+  /* 遮罩本身是可点的关闭区域，别让选择光标跑出来 */
+  cursor: zoom-out;
+  animation: fade 120ms ease-out;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.stage {
+  position: relative;
+  margin: 0;
+  max-width: min(94vw, 1400px);
+  cursor: default;
+}
+
+.image {
+  display: block;
+  max-width: min(94vw, 1400px);
+  max-height: 78vh;
+  object-fit: contain;
+  background: #16161b;
+  /* 与卡片同款 bezel：左上亮、右下暗 */
+  box-shadow:
+    inset 0 -3px 0 0 rgba(0, 0, 0, 0.5),
+    inset -3px 0 0 0 rgba(0, 0, 0, 0.5),
+    inset 0 3px 0 0 rgba(255, 255, 255, 0.22),
+    inset 3px 0 0 0 rgba(255, 255, 255, 0.22),
+    0 18px 60px rgba(0, 0, 0, 0.6);
+}
+
+/* 占位 SVG 是像素画，放大后要保持硬边，不能被浏览器插值糊掉 */
+.pixelated {
+  image-rendering: pixelated;
+}
+
+.caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.6rem;
+  font-family: Minecraft, Minercraftory, sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.counter {
+  font-family: Minecraft, Minercraftory, monospace;
+  color: #fff;
+}
+
+/* ------------------------------------------------------------- controls */
+
+.ctl {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  font-family: Minecraft, Minercraftory, monospace;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.66);
+  border: none;
+  box-shadow:
+    inset 0 -2px 0 0 rgba(0, 0, 0, 0.55),
+    inset -2px 0 0 0 rgba(0, 0, 0, 0.55),
+    inset 0 2px 0 0 rgba(255, 255, 255, 0.28),
+    inset 2px 0 0 0 rgba(255, 255, 255, 0.28);
+}
+
+.ctl:hover {
+  background: var(--ifm-color-primary, #3b8526);
+}
+
+.close {
+  top: 1rem;
+  right: 1rem;
+  width: 40px;
+  height: 40px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.prev,
+.next {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 56px;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.prev {
+  left: 1rem;
+}
+
+.next {
+  right: 1rem;
+}
+
+@media screen and (max-width: 996px) {
+  .overlay {
+    padding: 3rem 0.75rem;
+  }
+
+  .image {
+    max-height: 70vh;
+  }
+
+  .prev,
+  .next {
+    width: 36px;
+    height: 48px;
+  }
+}

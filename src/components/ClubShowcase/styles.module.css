@@ -139,10 +139,52 @@
   object-fit: cover;
 }
 
+/* 主图的点击热区。绝对定位铺满 .frame（而不是 height:100%），
+   这样图片高度不受百分比解析影响，aspect-ratio 仍由 .frame 决定。 */
+.zoom {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  line-height: 0;
+  cursor: zoom-in;
+}
+
+.zoom:focus-visible {
+  outline: 3px solid var(--club-accent, var(--primary-color, #3b8526));
+  outline-offset: -3px;
+}
+
+/* 「点击放大」提示：默认隐身，hover/键盘聚焦时才出现，不挡任何点击 */
+.zoomHint {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 2;
+  padding: 2px 7px;
+  font-family: Minecraft, Minercraftory, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  background: rgba(0, 0, 0, 0.66);
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease-out;
+}
+
+.frame:hover .zoomHint,
+.zoom:focus-visible ~ .zoomHint {
+  opacity: 1;
+}
+
 .phBadge {
   position: absolute;
   top: 8px;
   left: 8px;
+  z-index: 2;
   padding: 2px 7px;
   font-family: Minecraft, Minercraftory, sans-serif;
   font-size: 11px;
@@ -150,10 +192,13 @@
   background: rgba(0, 0, 0, 0.66);
   color: #ffd479;
   border: 1px dashed rgba(255, 212, 121, 0.65);
+  /* 角标只是标注，别抢走图片热区的点击 */
+  pointer-events: none;
 }
 
 .nav {
   position: absolute;
+  z-index: 3;
   top: 50%;
   transform: translateY(-50%);
   width: 30px;
@@ -187,11 +232,13 @@
   position: absolute;
   right: 8px;
   bottom: 8px;
+  z-index: 2;
   padding: 2px 7px;
   font-family: Minecraft, Minercraftory, monospace;
   font-size: 11px;
   background: rgba(0, 0, 0, 0.66);
   color: #fff;
+  pointer-events: none;
 }
 
 .thumbs {
