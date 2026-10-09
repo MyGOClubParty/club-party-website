@@ -176,7 +176,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} 山商方块嘉年华 · 山商MC煤炭社 主办`,
+      copyright: `Copyright © ${new Date().getFullYear()} MyGOClubParty.`,
     },
     prism: {
       theme: prismThemes.github,

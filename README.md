@@ -207,6 +207,6 @@ npx serve build        # 或 npm run serve
 
 <div align="center">
 
-Copyright © 2026 山商方块嘉年华 · 山商MC煤炭社 主办 · Built with Docusaurus.
+Copyright © 2026 MyGOClubParty
 
 </div>
