@@ -31,7 +31,7 @@ function shuffle<T>(input: readonly T[]): T[] {
 export default function ClubShowcaseSection({
   clubs = allClubs,
   title = '社团风采',
-  description = '七个学生社团联合参展。为避免先后之争，每次进入本页，各社团的顺序都会重新随机排列。',
+  description = '七社联袂，各展风华。展示无分先后，每次刷新，都是一次全新的相遇。',
 }: ClubShowcaseSectionProps): ReactNode {
   const [ordered, setOrdered] = useState<Club[]>(() => clubs.slice());
   const [shuffled, setShuffled] = useState(false);
