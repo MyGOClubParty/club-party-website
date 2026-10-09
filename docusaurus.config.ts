@@ -14,6 +14,14 @@ const config: Config = {
     v4: true, // Improve compatibility with the upcoming Docusaurus v4
   },
 
+  // 页脚用到的两个常量（src/theme/Footer 读取）
+  customFields: {
+    // 页脚「Source Codes」按钮的目标仓库
+    sourceCodeUrl: 'https://github.com/MyGOClubParty/club-party-website',
+    // 跟在版权行末尾的一句话
+    builtWith: 'Built with Docusaurus.',
+  },
+
   // Set the production url of your site here
   url: 'https://club-party.iicemeta.com',
   // Set the /<baseUrl>/ pathname under which your site is served
@@ -78,7 +86,7 @@ const config: Config = {
       title: '山商方块嘉年华',
       logo: {
         alt: '山商方块嘉年华 Logo',
-        src: 'img/logo.svg',
+        src: 'img/logo.png',
       },
       items: [
         {

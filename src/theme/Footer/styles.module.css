@@ -1,0 +1,144 @@
+/**
+ * Minecraft 风格页脚：草方块包边 + 深板岩底纹 + GUI 按钮贴图。
+ * 贴图统一用 `image-rendering: pixelated` 放大，保证方块边缘不被插值糊掉。
+ */
+
+.footer {
+  position: relative;
+  /* 深板岩平铺 + 暗化，浅色/深色主题下都保持"地底"观感与足够对比 */
+  background-image: linear-gradient(rgba(9, 11, 13, 0.88), rgba(9, 11, 13, 0.93)),
+    url('/mc/blocks/deepslate.png');
+  background-size: auto, 64px 64px;
+  background-repeat: repeat, repeat;
+  image-rendering: pixelated;
+  color: #fff;
+  font-family: Minecraft, Minercraftory, sans-serif;
+}
+
+/* 顶部一条草方块，与首页 hero 下方的分隔带同款 */
+.grassEdge {
+  height: 34px;
+  background-image: url('/mc/blocks/grass_block_side.png');
+  background-size: 34px 34px;
+  background-repeat: repeat;
+  image-rendering: pixelated;
+  border-bottom: 3px solid rgba(0, 0, 0, 0.35);
+}
+
+.inner {
+  padding: 2.25rem 1rem 1.5rem;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 1.75rem 2rem;
+}
+
+.columnTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.9rem;
+  font-family: Minecraft, Minercraftory, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.65);
+}
+
+/* 栏目标题前的方块贴图：18px = 16px 贴图放大 1.125 倍，仍是整数方块 */
+.titleIcon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  max-width: 220px;
+}
+
+.item {
+  margin: 0;
+}
+
+/* 链接 = Minecraft GUI 按钮（200x20 贴图拉伸填满），悬停换高亮态 */
+.mcButton {
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  min-height: 24px;
+  padding: 3px 12px;
+  font-family: Minecraft, Minercraftory, sans-serif;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: #fff;
+  text-decoration: none;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.65);
+  background-image: url('/mc/gui/button.png');
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  border: none;
+  box-sizing: border-box;
+}
+
+.mcButton:hover,
+.mcButton:focus-visible {
+  color: #ffffa0;
+  text-decoration: none;
+  background-image: url('/mc/gui/button_highlighted.png');
+}
+
+.mcButton:active {
+  transform: translateY(1px);
+}
+
+.bottom {
+  margin-top: 2rem;
+  padding-top: 1.1rem;
+  border-top: 2px solid rgba(255, 255, 255, 0.14);
+  font-family: var(--ifm-font-family-base);
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.copyright {
+  margin: 0;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.sourceLine {
+  margin: 0.75rem 0 0;
+}
+
+/* 「Source Codes」按钮按内容宽度收缩，不做整行 */
+.sourceButton {
+  width: auto;
+  min-width: 150px;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+@media screen and (max-width: 996px) {
+  .inner {
+    padding: 1.5rem 1rem 1.25rem;
+  }
+
+  .columns {
+    gap: 1.5rem;
+  }
+
+  .list {
+    max-width: none;
+  }
+}
