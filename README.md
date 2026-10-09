@@ -208,7 +208,7 @@ npx serve build        # 或 npm run serve
 | 山商MC煤炭社 | 主办单位 | 元山商校园展示 | [`mc-coal.mdx`](docs/clubs/mc-coal.mdx) |
 | 电脑技术协会 | 承办单位 | 待定 | [`computer-tech.mdx`](docs/clubs/computer-tech.mdx) |
 | X动漫联盟协会 | 承办单位 | 待定 | [`x-anime.mdx`](docs/clubs/x-anime.mdx) |
-| 摄影协会 | 协办单位 | 待定 | [`photography.mdx`](docs/clubs/photography.mdx) |
+| 山商视觉摄影协会 | 协办单位 | 待定 | [`photography.mdx`](docs/clubs/photography.mdx) |
 | 516轮滑协会 | 协办单位 | 待定 | [`skate-516.mdx`](docs/clubs/skate-516.mdx) |
 | 轩辕文学社 | 协办单位 | 待定 | [`xuanyuan-literature.mdx`](docs/clubs/xuanyuan-literature.mdx) |
 | 魔术社 | 协办单位 | 待定 | [`magic.mdx`](docs/clubs/magic.mdx) |

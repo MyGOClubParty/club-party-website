@@ -62,7 +62,7 @@
     },
     {
       "slug": "photography",
-      "name": "摄影协会",
+      "name": "山商视觉摄影协会",
       "abbr": "PH",
       "role": "co-organizer",
       "roleLabel": "协办单位",
@@ -70,12 +70,11 @@
       "project": "展示项目待定",
       "summary": "活动协办方。参与社团展示区域与互动项目设计，协同开展活动宣传，并参与优秀打卡图片的遴选工作。",
       "tags": ["摄影", "打卡", "作品遴选"],
-      "logo": "/img/clubs/photography/logo.svg",
-      "cover": "/img/clubs/photography/cover.svg",
+      "logo": "/img/clubs/photography/logo.png",
+      "cover": "/img/clubs/photography/shot-1.jpg",
       "images": [
-        "/img/clubs/photography/shot-1.svg",
-        "/img/clubs/photography/shot-2.svg",
-        "/img/clubs/photography/shot-3.svg"
+        "/img/clubs/photography/shot-1.jpg",
+        "/img/clubs/photography/shot-2.png"
       ],
       "doc": "/docs/clubs/photography"
     },

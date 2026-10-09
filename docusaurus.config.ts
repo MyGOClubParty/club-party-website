@@ -149,7 +149,7 @@ const config: Config = {
               to: '/docs/clubs/x-anime',
             },
             {
-              label: '摄影协会',
+              label: '山商视觉摄影协会',
               to: '/docs/clubs/photography',
             },
             {
