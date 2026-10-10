@@ -211,7 +211,7 @@ npx serve build        # 或 npm run serve
 | 山商视觉摄影协会 | 协办单位 | 待定 | [`photography.mdx`](docs/clubs/photography.mdx) |
 | 516轮滑协会 | 协办单位 | 待定 | [`skate-516.mdx`](docs/clubs/skate-516.mdx) |
 | 轩辕文学社 | 协办单位 | 待定 | [`xuanyuan-literature.mdx`](docs/clubs/xuanyuan-literature.mdx) |
-| 魔术社 | 协办单位 | 待定 | [`magic.mdx`](docs/clubs/magic.mdx) |
+| 山商魔术社 | 协办单位 | 待定 | [`magic.mdx`](docs/clubs/magic.mdx) |
 
 ## 相关链接
 

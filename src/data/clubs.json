@@ -52,12 +52,9 @@
       "project": "展示项目待定",
       "summary": "活动承办方。结合社团自身特色设计服务器内展示区域与互动项目，并提前完成内容审核、场景布置、任务说明及打卡点设置。",
       "tags": ["动漫", "展示区域", "互动项目"],
-      "logo": "/img/clubs/x-anime/logo.svg",
-      "cover": "/img/clubs/x-anime/cover.svg",
-      "images": [
-        "/img/clubs/x-anime/shot-1.svg",
-        "/img/clubs/x-anime/shot-2.svg"
-      ],
+      "logo": "/img/clubs/x-anime/logo.jpg",
+      "cover": "/img/clubs/x-anime/shot-1.jpg",
+      "images": ["/img/clubs/x-anime/shot-1.jpg"],
       "doc": "/docs/clubs/x-anime"
     },
     {
@@ -116,7 +113,7 @@
     },
     {
       "slug": "magic",
-      "name": "魔术社",
+      "name": "山商魔术社",
       "abbr": "魔",
       "role": "co-organizer",
       "roleLabel": "协办单位",
@@ -124,7 +121,7 @@
       "project": "展示项目待定",
       "summary": "活动协办方。参与社团展示区域与互动项目设计，协办本次校园联谊二课活动并共同开展活动宣传。",
       "tags": ["魔术", "展示区域"],
-      "logo": "/img/clubs/magic/logo.svg",
+      "logo": "/img/clubs/magic/logo.jpg",
       "cover": "/img/clubs/magic/cover.svg",
       "images": ["/img/clubs/magic/shot-1.svg"],
       "doc": "/docs/clubs/magic"

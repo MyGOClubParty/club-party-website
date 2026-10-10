@@ -139,6 +139,24 @@
   object-fit: cover;
 }
 
+/* 竖图（如 X动漫联盟协会的海报）改 contain：整幅完整可见，不上下裁切。
+   代价是左右留空档，由 .backdrop 填。 */
+.contain {
+  object-fit: contain;
+}
+
+/* 竖图衬底：同一张图放大、虚化、压暗后铺满整个框。
+   inset 取负值把边缘撑到框外 —— 否则 blur 会把四边羽化成半透明，露出底色。 */
+.backdrop {
+  position: absolute;
+  inset: -8%;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(22px) brightness(0.5) saturate(1.05);
+  pointer-events: none;
+}
+
 /* 主图的点击热区。绝对定位铺满 .frame（而不是 height:100%），
    这样图片高度不受百分比解析影响，aspect-ratio 仍由 .frame 决定。 */
 .zoom {

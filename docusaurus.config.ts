@@ -161,7 +161,7 @@ const config: Config = {
               to: '/docs/clubs/xuanyuan-literature',
             },
             {
-              label: '魔术社',
+              label: '山商魔术社',
               to: '/docs/clubs/magic',
             },
           ],
