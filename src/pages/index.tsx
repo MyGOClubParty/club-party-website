@@ -326,7 +326,6 @@ function HomepageHeader() {
           align="center"
           justify="center"
           style={{gap: 12, marginBottom: 10, flexWrap: 'wrap'}}>
-          <img className={styles.schoolLogo} src={activity.schoolLogo} alt={activity.school} />
           <Tag className="Tag_success">多社团联合</Tag>
           <Tag>{activity.clubCount} 个社团</Tag>
           <Tag>2026</Tag>

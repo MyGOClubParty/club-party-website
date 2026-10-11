@@ -512,14 +512,6 @@
   animation-delay: 0.05s;
 }
 
-.schoolLogo {
-  height: 34px;
-  width: auto;
-  padding: 3px 6px;
-  background: rgba(255, 255, 255, 0.92);
-  display: block;
-}
-
 .titleWrap {
   position: relative;
   display: inline-block;
