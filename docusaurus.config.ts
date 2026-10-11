@@ -97,6 +97,8 @@ const config: Config = {
         },
         {to: '/docs/clubs', label: '社团风采', position: 'left'},
         {to: '/blog', label: '活动日志', position: 'left'},
+        // 右侧按数组顺序从左往右排：「关于」在 GitHub 左边
+        {to: '/about', label: '关于', position: 'right'},
         {
           href: 'https://github.com/MyGOClubParty/',
           label: 'GitHub',
@@ -166,15 +168,8 @@ const config: Config = {
             },
           ],
         },
-        {
-          title: '关于',
-          items: [
-            {
-              label: 'GitHub',
-              href: 'https://github.com/MyGOClubParty/club-party-website',
-            },
-          ],
-        },
+        // 「关于」栏已撤掉：关于本站进了导航栏，仓库链接由下面的 Source Codes 按钮承担，
+        // 而那个按钮指向的正是原来这一栏的 GitHub 地址，没有信息损失。
       ],
       copyright: `Copyright © ${new Date().getFullYear()} MyGOClubParty.`,
     },

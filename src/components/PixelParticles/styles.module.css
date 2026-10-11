@@ -1,0 +1,9 @@
+/* 粒子画布铺满 hero 的装饰层，只负责画，不接事件。 */
+.canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}

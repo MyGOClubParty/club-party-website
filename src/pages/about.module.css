@@ -1,0 +1,473 @@
+/*
+ * 「关于本站」页面。颜色一律走 Infima 变量 + 本页自己的 --about-* 变量，
+ * 保证浅色 / 深色主题都可读（对比度由 verify/probe-about-colors.cjs 量）。
+ *
+ * 像素贴图的用法有两处讲究：
+ * - 贴图小（<10KB）会被打包器内联成 base64，断言不能查 URL 路径，只能按字节比对。
+ * - `mix-blend-mode` 会被**最近的** stacking context 圈住，所以承载云层的 .sky
+ *   绝不能带 z-index（那样它会自成 stacking context，云就只能跟透明背景混，
+ *   黑底直接显出来）。隔离交给 .hero 的 isolation。
+ */
+
+.page {
+  --about-sky-1: #5c9ee0;
+  --about-sky-2: #b8d8f4;
+  --about-edge: rgba(20, 26, 34, 0.42);
+  --about-bevel-light: rgba(255, 255, 255, 0.85);
+  --about-bevel-dark: rgba(20, 26, 34, 0.16);
+  --about-title: #10233c;
+  --about-title-shadow: 2px 2px 0 rgba(255, 255, 255, 0.65);
+  --about-lead: #22303f;
+
+  padding: 0 0 4rem;
+}
+
+[data-theme='dark'] .page {
+  --about-sky-1: #0a1424;
+  --about-sky-2: #121a26;
+  --about-edge: rgba(0, 0, 0, 0.65);
+  --about-bevel-light: rgba(255, 255, 255, 0.14);
+  --about-bevel-dark: rgba(0, 0, 0, 0.55);
+  --about-title: #eef3fa;
+  --about-title-shadow: 2px 2px 0 rgba(0, 0, 0, 0.7);
+  --about-lead: #cfd6e0;
+}
+
+/* ------------------------------------------------------------------ hero */
+
+.hero {
+  position: relative;
+  /* 把云层的混合圈在 hero 内部，不让它去混整页背景 */
+  isolation: isolate;
+  overflow: hidden;
+  padding: 3rem 0 3.25rem;
+  margin-bottom: 2.5rem;
+  background: linear-gradient(
+    180deg,
+    var(--about-sky-1) 0%,
+    var(--about-sky-2) 55%,
+    var(--ifm-background-color) 100%
+  );
+}
+
+.sky {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/*
+ * 云：原版 clouds.png 是「黑底白云」且不带 alpha，直接当背景会是一整块黑。
+ * 用 screen 混合让黑部分自然消失（screen 里黑色是恒等元），云就浮在天空上了。
+ */
+.clouds {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background-image: url('/mc/environment/clouds.png');
+  background-repeat: repeat;
+  background-size: 1024px 1024px;
+  image-rendering: pixelated;
+  mix-blend-mode: screen;
+  opacity: 0.45;
+  /* 底部淡出，让天空带跟页面背景接得上 */
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 48%, transparent 90%);
+  mask-image: linear-gradient(180deg, #000 0%, #000 48%, transparent 90%);
+  /* 位移正好一个贴图周期，循环处无缝；70s 走 384px ≈ 5.5px/s，是「在动」不是「在晃」 */
+  animation: cloudDrift 150s linear infinite;
+}
+
+/* 夜云：screen 出来的白云在深色天空上亮得发白，会把标题和正文的对比度压垮。
+   降到 0.15 只留一点云影。 */
+[data-theme='dark'] .clouds {
+  opacity: 0.15;
+}
+
+@keyframes cloudDrift {
+  to {
+    background-position: 1024px 0;
+  }
+}
+
+.celestial {
+  position: absolute;
+  z-index: 1;
+  top: 2.5rem;
+  right: 7%;
+  width: 56px;
+  height: 56px;
+  image-rendering: pixelated;
+  /* 贴图是黑底无 alpha，靠 screen 把黑底吃掉，只留下日/月本体。
+     注意**不能**在这上面加 filter：带 filter 的元素会进隔离组，自己的
+     mix-blend-mode 就没背景可混了，黑底会原样显出来。 */
+  mix-blend-mode: screen;
+  animation: bob 7s ease-in-out infinite;
+}
+
+.sun {
+  display: block;
+}
+
+.moon {
+  display: none;
+  width: 44px;
+  height: 44px;
+}
+
+[data-theme='dark'] .sun {
+  display: none;
+}
+
+[data-theme='dark'] .moon {
+  display: block;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+.heroInner {
+  position: relative;
+  z-index: 3;
+}
+
+/* ------------------------------------------------------------- hero 文本 */
+
+.title {
+  position: relative;
+  margin: 0 0 0.8rem;
+  font-size: clamp(1.9rem, 4.4vw, 2.7rem);
+  color: var(--about-title);
+  text-shadow: var(--about-title-shadow);
+  /* 冒号只为下面动画的首帧写进合成层，避免开场抖一下 */
+  will-change: opacity, transform;
+}
+
+/*
+ * 附魔流光：把原版 enchanted_glint_item.png 当文字填充再平移，就是 MC 里
+ * 附魔物品那层走动的紫光。混合模式必须分主题：
+ *   浅色主题标题是深色字 → screen（往亮里叠）能看见；
+ *   深色主题标题接近纯白 → screen 叠深紫几乎不变，改成反相后 multiply（往暗里压）。
+ * 用 ::after + attr(data-text) 而不是多写一层 DOM：innerText 不会混进重复文案。
+ */
+.title::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  white-space: nowrap;
+  padding: inherit;
+  background-image: url('/mc/misc/enchanted_glint_item.png');
+  background-repeat: repeat;
+  background-size: 72px 72px;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  pointer-events: none;
+  animation: glintSweep 2.8s linear infinite;
+}
+
+/*
+ * 深色主题：标题接近纯白，screen 叠深紫几乎不变，只能反相后 multiply（往暗里压）。
+ * 反相会把紫色翻成黄绿，所以再 hue-rotate 180° 转回紫——这样两个主题的流光同色。
+ */
+[data-theme='dark'] .title::after {
+  filter: invert(1) hue-rotate(180deg) saturate(0.9);
+  mix-blend-mode: multiply;
+}
+
+@keyframes glintSweep {
+  to {
+    background-position: 72px 0;
+  }
+}
+
+/*
+ * 正文段落。**不要**再给 max-width：上一个版本卡在 46rem（736px），
+ * 比页面上任何一块面板（1108px）都窄，于是第一行在第 736px 处断行，
+ * 恰好把「电脑技术协会」这个链接劈成「电脑技术协 / 会」两行。
+ */
+.lead {
+  margin: 0 0 1.5rem;
+  font-size: 1.02rem;
+  line-height: 1.9;
+  color: var(--about-lead);
+  /* 版心拉满后自然断行会变成「长行 + 几个字的尾巴」；配平让两行等长。
+     老浏览器不认这条，退化成普通断行，不会坏。 */
+  text-wrap: balance;
+}
+
+/* 专有名词不许跨行拆开——即便将来版心再变窄，也只会整块挪到下一行。 */
+.ownerLink {
+  font-weight: 600;
+  margin: 0 0.2em;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------- 开发单位卡片 */
+
+.ownerCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  border: 2px solid var(--about-edge);
+  border-radius: 4px;
+  /* 方块贴图做底纹：soft-light 对中灰几乎不动，只留一点点石头的颗粒感 */
+  background-color: var(--ifm-background-surface-color);
+  background-image: url('/mc/blocks/stone.png');
+  background-size: 20px 20px;
+  background-blend-mode: soft-light;
+  box-shadow:
+    inset 2px 2px 0 var(--about-bevel-light),
+    inset -2px -2px 0 var(--about-bevel-dark),
+    0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.ownerBlockFrame {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 2px solid var(--about-edge);
+  border-radius: 4px;
+  background-color: var(--ifm-color-emphasis-100);
+  background-image: url('/mc/blocks/stone.png');
+  background-size: 16px 16px;
+  background-blend-mode: overlay;
+  box-shadow:
+    inset 2px 2px 0 var(--about-bevel-light),
+    inset -2px -2px 0 var(--about-bevel-dark);
+  transition: transform 0.3s ease;
+}
+
+.ownerCard:hover .ownerBlockFrame {
+  transform: translateY(-3px) rotate(-5deg);
+}
+
+.ownerBlock {
+  width: 30px;
+  height: 30px;
+  image-rendering: pixelated;
+}
+
+.ownerTitle {
+  margin: 0 0 0.35rem;
+  font-weight: 700;
+  color: var(--ifm-font-color-base);
+}
+
+.ownerText {
+  margin: 0;
+  line-height: 1.8;
+  color: var(--ifm-color-emphasis-700);
+}
+
+/* ------------------------------------------------------------- 小节面板 */
+
+.section {
+  margin-bottom: 2.25rem;
+}
+
+/*
+ * 滚动入场。只对「挂载时还在首屏之外」的小节生效（判断在 useReveal 里）——
+ * 已经在视口里的小节不动它，否则 SSG 画好的画面会先消失再淡入。
+ * transition 只写在 in 这一侧：pending 那一下必须是瞬时的，不能淡出。
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .section[data-reveal='pending'] {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+
+  .section[data-reveal='in'] {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.55s ease,
+      transform 0.55s cubic-bezier(0.2, 0.7, 0.3, 1);
+  }
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+  font-size: 1.35rem;
+}
+
+.sectionIconFrame {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 2px solid var(--about-edge);
+  border-radius: 4px;
+  background-color: var(--ifm-color-emphasis-100);
+  background-image: url('/mc/blocks/stone.png');
+  background-size: 16px 16px;
+  background-blend-mode: overlay;
+  box-shadow:
+    inset 2px 2px 0 var(--about-bevel-light),
+    inset -2px -2px 0 var(--about-bevel-dark);
+  transition: transform 0.3s ease;
+}
+
+.sectionTitle:hover .sectionIconFrame {
+  transform: translateY(-3px) rotate(-5deg);
+}
+
+.sectionIcon {
+  width: 26px;
+  height: 26px;
+  image-rendering: pixelated;
+}
+
+.panel {
+  padding: 0.5rem 1.25rem;
+  border: 2px solid var(--about-edge);
+  border-radius: 4px;
+  background-color: var(--ifm-background-surface-color);
+  background-image: url('/mc/blocks/stone.png');
+  background-size: 20px 20px;
+  background-blend-mode: soft-light;
+  box-shadow:
+    inset 2px 2px 0 var(--about-bevel-light),
+    inset -2px -2px 0 var(--about-bevel-dark),
+    0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+/* ----------------------------------------------------------------- 表格 */
+
+.table {
+  width: 100%;
+  margin: 1rem 0;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.table th,
+.table td {
+  padding: 0.6rem 0.25rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.table tbody tr {
+  transition: background-color 0.18s ease;
+}
+
+.table tbody tr:hover {
+  background-color: var(--ifm-color-emphasis-100);
+}
+
+.table tr:last-child th,
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.table th {
+  width: 12rem;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-weight: 600;
+  color: var(--ifm-color-emphasis-800);
+}
+
+.table td {
+  color: var(--ifm-font-color-base);
+}
+
+.note {
+  margin: 0.5rem 0 1rem;
+  line-height: 1.8;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.code {
+  margin: 1rem 0;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  border: 2px solid var(--about-edge);
+  border-radius: 4px;
+  background-color: var(--ifm-code-background);
+  box-shadow: inset 2px 2px 0 var(--about-bevel-dark);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+/* ----------------------------------------------------------- 入场与降级 */
+
+/* hero 三块内容依次上浮，做法与首页一致 */
+.title,
+.lead,
+.ownerCard {
+  animation: rise 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.title {
+  animation-delay: 0.06s;
+}
+
+.lead {
+  animation-delay: 0.15s;
+}
+
+.ownerCard {
+  animation-delay: 0.24s;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .table th {
+    width: auto;
+  }
+
+  .celestial {
+    width: 40px;
+    height: 40px;
+    top: 1.5rem;
+    right: 5%;
+  }
+}
+
+/* 系统要求减少动效：云、日月、流光、入场、滚动淡入一律停掉 */
+@media (prefers-reduced-motion: reduce) {
+  .clouds,
+  .celestial,
+  .title,
+  .lead,
+  .ownerCard,
+  .title::after,
+  .table tbody tr,
+  .sectionIconFrame,
+  .ownerBlockFrame {
+    animation: none;
+    transition: none;
+  }
+}
