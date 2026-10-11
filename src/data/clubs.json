@@ -122,8 +122,11 @@
       "summary": "活动协办方。参与社团展示区域与互动项目设计，协办本次校园联谊二课活动并共同开展活动宣传。",
       "tags": ["魔术", "展示区域"],
       "logo": "/img/clubs/magic/logo.jpg",
-      "cover": "/img/clubs/magic/cover.svg",
-      "images": ["/img/clubs/magic/shot-1.svg"],
+      "cover": "/img/clubs/magic/shot-1.jpg",
+      "images": [
+        "/img/clubs/magic/shot-1.jpg",
+        "/img/clubs/magic/shot-2.jpg"
+      ],
       "doc": "/docs/clubs/magic"
     }
   ]
