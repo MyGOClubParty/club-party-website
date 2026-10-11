@@ -1,35 +1,515 @@
 /**
- * CSS files with the .module.css suffix will be treated as CSS modules
- * and scoped locally.
+ * 首页。hero 是一个「Minecraft 主菜单 × 方块校园」的画面：天空渐变打底，上面按 z 序叠
+ * 星星 / 云 / 日月 / 两层山峦 / 火把灯笼 / 粒子 / 烟花，正文再压在最上层。
+ *
+ * 四处必须注意的：
+ * - `.heroBanner` 要 `isolation: isolate`：云的 `mix-blend-mode: screen` 需要有个明确的
+ *   混合底（就是这层天空渐变）。而 `.scene` **不能带 z-index** —— 那样它自成 stacking
+ *   context，云就只能跟透明背景混，黑底会直接显出来。
+ * - 配色**整套跟着主题走**：默认（深色主题）是夜空 + 月亮 + 灯火，`[data-theme='light']`
+ *   换成白天 + 太阳，日间色跟 /about 同一套。随主题变的东西全部走下面那张变量表，
+ *   组件里不要再出现写死的颜色 —— 漏一处换主题就会露馅（对比度由
+ *   verify/probe-home-colors.cjs 两个主题各量一遍）。
+ * - **一格 = 一张贴图 = 一列**（`--unit`，由组件写死成 16px）。地形区里所有尺寸都必须从
+ *   `--unit` 推：贴图平铺 = `--unit`、草色顶边 = `--unit / 4`（grass_block_side 顶部 4/16 行）、
+ *   火把与灯笼的盒子 = `--unit` 见方。凡是这里再出现 4px / 32px 这类字面值，比例就会再次跑偏。
+ * - 两层山峦的底边都压在地平线（`bottom: 0`）上，抬高的只是**轮廓**。底边不齐平的话，
+ *   近景矮列的上方会漏出「远景底边 → 近景顶边」之间的一条天空 —— 那就是用户截图里
+ *   标出来的「泥土之间的空隙」。
+ * - 土体是一整块用 `clip-path` 切的，不是一排柱子：柱子方案里每列各自从自己左边缘起铺
+ *   贴图，列与列之间会有肉眼可见的竖向错缝。
+ *
+ * 竖直方向只放草方块与泥土：**石块在地表以下，俯视/侧视都不该露在草方块的上方或下方**。
+ * 所以土体里没有石头层 —— 山脚直接接下面 GrassGarden 那条草方块带（那就是地面上的草）。
  */
 
 .heroBanner {
+  /* ==================================================== 夜色（默认 / 深色主题） */
+  --sky-top: #060a18;
+  --sky-mid: #0b1430;
+  --sky-low: #131f45;
+  --sky-bottom: #1b2950;
+  --sky-glow: rgba(88, 112, 182, 0.5);
+  --cloud-opacity: 0.12;
+  --stars-opacity: 1;
+  --shade-back: rgba(30, 40, 68, 0.62);
+  --shade-front: rgba(22, 30, 52, 0.3);
+  --ridge-edge: rgba(0, 0, 0, 0.4);
+  --ground-haze: rgba(6, 10, 24, 0.52);
+  --moon-display: block;
+  --sun-display: none;
+  --halo-sun: rgba(255, 236, 170, 0.34);
+  --hero-fg: #fff;
+  --hero-fg-soft: rgba(255, 255, 255, 0.86);
+  --hero-fg-body: rgba(255, 255, 255, 0.92);
+  --hero-hint: rgba(255, 255, 255, 0.72);
+  --hero-shadow: 0 1px 10px rgba(0, 0, 0, 0.9);
+  --title-shadow: 3px 3px 0 rgba(0, 0, 0, 0.6), 0 6px 18px rgba(0, 0, 0, 0.75);
+  --panel-bg: rgba(0, 0, 0, 0.42);
+  --panel-line: rgba(255, 255, 255, 0.18);
+  --panel-fg: #fff;
+  --panel-fg-soft: rgba(255, 255, 255, 0.66);
+  --splash-fg: #f7e04b;
+  --splash-shadow: 2px 2px 0 rgba(0, 0, 0, 0.8);
+  --glint-filter: invert(1) hue-rotate(180deg) saturate(0.9);
+  --glint-blend: multiply;
+  --glint-opacity: 0.55;
+
   position: relative;
-  /* 下内边距要留够：花圃里的花最高 42px，会从下面长进 hero 一小截 */
-  padding: 3.5rem 0 3.5rem;
-  text-align: center;
+  isolation: isolate;
   overflow: hidden;
-  /* 草方块贴图平铺 + 暗化，保证浅色/深色主题下文字都够对比 */
-  background-image: linear-gradient(rgba(14, 16, 18, 0.82), rgba(14, 16, 18, 0.9)),
-    url('/mc/blocks/grass_block_side.png');
-  background-size: auto, 56px 56px;
-  background-repeat: repeat, repeat;
-  image-rendering: pixelated;
-  color: #fff;
-  /* 平移正好一个贴图周期（56px），循环处无缝。26s 一圈 ≈ 2px/s，是"在动"而不是"在晃"。 */
-  animation: heroPan 26s linear infinite;
+  display: flex;
+  flex-direction: column;
+  /* 正文在「留出山峦之后剩下的那块」里竖直居中：视口越高，天空越开阔，
+     不会出现「上面挤一坨、下面一大片空」 */
+  justify-content: center;
+  /* 首屏铺满视口：减掉吸顶导航栏那一截。svh 是「地址栏展开时」的小视口高度 ——
+     手机上不会因为地址栏收放而上下跳，所以写在后面覆盖 vh（老浏览器兜底）。 */
+  min-height: calc(100vh - var(--ifm-navbar-height, 3.75rem));
+  min-height: calc(100svh - var(--ifm-navbar-height, 3.75rem));
+  /* 下内边距必须 ≥ 山峦占的高度：远景最高 9 格 × 16px = 144px，近景最高 6 格 + 火把 1 格 = 112px，
+     取远景那 144px。下限低于它的话，矮窗口 / 竖屏手机上正文会压到山脊和火把上。 */
+  padding: clamp(2rem, 5vh, 4rem) 0 clamp(9.5rem, 17vh, 11rem);
+  text-align: center;
+  color: var(--hero-fg);
+  background:
+    radial-gradient(130% 88% at 50% 108%, var(--sky-glow) 0%, rgba(0, 0, 0, 0) 58%),
+    linear-gradient(
+      180deg,
+      var(--sky-top) 0%,
+      var(--sky-mid) 38%,
+      var(--sky-low) 68%,
+      var(--sky-bottom) 100%
+    );
 }
 
-@keyframes heroPan {
-  to {
-    background-position: 0 0, -56px 0;
+/* ==================================================== 白天（浅色主题）
+   跟 /about 的 hero 共用一套日间色：天蓝 → 淡蓝、云是白的、山体发白发灰（大气透视）、
+   正文反过来用深色。日/月由这一层换掉，DOM 不动 —— 换主题不重新渲染，SSG 依旧确定。 */
+[data-theme='light'] .heroBanner {
+  --sky-top: #5c9ee0;
+  --sky-mid: #8ec4ec;
+  --sky-low: #b8d8f4;
+  --sky-bottom: #dcecfb;
+  --sky-glow: rgba(255, 255, 255, 0.6);
+  --cloud-opacity: 0.42;
+  --stars-opacity: 0;
+  /* 白天的大气透视是「越远越淡」，所以远景往白里推；近景不动 —— 压一层白会把
+     白天的土色洗成灰白（第一版 0.55 就是这样，整座山看着像一块白板）。 */
+  --shade-back: rgba(206, 228, 248, 0.34);
+  --shade-front: rgba(255, 255, 255, 0);
+  --ridge-edge: rgba(16, 35, 60, 0.22);
+  --ground-haze: rgba(226, 242, 253, 0.22);
+  --moon-display: none;
+  --sun-display: block;
+  --halo-sun: rgba(255, 240, 190, 0.8);
+  --hero-fg: #10233c;
+  --hero-fg-soft: rgba(16, 35, 60, 0.84);
+  --hero-fg-body: rgba(16, 35, 60, 0.9);
+  --hero-hint: rgba(16, 35, 60, 0.75);
+  --hero-shadow: 0 1px 6px rgba(255, 255, 255, 0.85);
+  --title-shadow: 2px 2px 0 rgba(255, 255, 255, 0.7), 0 6px 16px rgba(255, 255, 255, 0.55);
+  --panel-bg: rgba(255, 255, 255, 0.62);
+  --panel-line: rgba(16, 35, 60, 0.16);
+  --panel-fg: #10233c;
+  --panel-fg-soft: rgba(16, 35, 60, 0.7);
+  --splash-fg: #4a2800;
+  --splash-shadow: 1px 1px 0 rgba(255, 255, 255, 0.85);
+  --glint-filter: none;
+  --glint-blend: screen;
+  /* 深字上 screen 会把整块字提亮：0.75 时标题整个变成淡紫（实拍确认），
+     压到 0.3 才是「深色字 + 一层走的紫光」。 */
+  --glint-opacity: 0.3;
+}
+
+/*
+ * 贴近地面压一层雾，两件事一起办：
+ * - 山体底部跟下面 GrassGarden 的草带接得上，hero 底边不再是一条硬线；
+ * - 烟花是从地面往上打的，底部的光被压下去更像远在地平线后面。
+ * 夜里是夜色、白天是贴地白雾，颜色走 --ground-haze。
+ * z-index 2 让它盖住山体与粒子，但仍在正文（z-index 3）之下。
+ */
+.heroBanner::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 200px;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, var(--ground-haze) 100%);
+}
+
+/* 装饰层：铺满 hero，不接指针事件（否则会挡住按钮和文字选中） */
+.scene {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.heroInner {
+  position: relative;
+  z-index: 3;
+}
+
+/* ------------------------------------------------------------------ 星空 */
+
+.stars {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  /* 白天没有星星。整层淡出而不是 display: none —— DOM 与动画都保持原样，
+     断言（颗数 / 闪烁）不用按主题分叉，也不会有元素突然脱离文档流。 */
+  opacity: var(--stars-opacity);
+}
+
+.star {
+  position: absolute;
+  left: calc(var(--x) * 1%);
+  top: calc(var(--y) * 1%);
+  width: var(--s);
+  height: var(--s);
+  background: #fff;
+  /* 一点点光晕，让 2px 的点也能被看见 */
+  box-shadow: 0 0 4px rgba(214, 231, 255, 0.75);
+  animation: twinkle var(--dur, 3s) ease-in-out infinite;
+}
+
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.22;
+  }
+
+  50% {
+    opacity: 0.95;
   }
 }
 
-/* 烟花 canvas 是 absolute 且 z-index: 0，正文要抬到它上面 */
-.heroInner {
-  position: relative;
+/* -------------------------------------------------------------------- 云 */
+
+/*
+ * 原版 clouds.png 是「黑底白云」且不带 alpha，直接铺会是一整块黑。
+ * screen 混合里黑色是恒等元，黑底自然消失 —— 而且这个模式两个主题都对：夜里出来是灰白的
+ * 云影，白天出来就是白云。所以只有不透明度需要随主题变（夜里 0.12 / 白天 0.42）。
+ *
+ * 只留一条「地平线上方」的云带是实拍逼出来的：铺满整片天空时看着像电视雪花，
+ * 而且会把标题的对比度吃掉。
+ */
+.clouds {
+  position: absolute;
+  inset: 0;
   z-index: 1;
+  background-image: url('/mc/environment/clouds.png');
+  background-repeat: repeat;
+  background-size: 1024px 1024px;
+  image-rendering: pixelated;
+  mix-blend-mode: screen;
+  opacity: var(--cloud-opacity);
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    transparent 36%,
+    rgba(0, 0, 0, 0.2) 46%,
+    #000 58%,
+    #000 74%,
+    transparent 90%
+  );
+  mask-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    transparent 36%,
+    rgba(0, 0, 0, 0.2) 46%,
+    #000 58%,
+    #000 74%,
+    transparent 90%
+  );
+  /* 位移正好一个贴图周期，循环处无缝；180s 走 1024px ≈ 5.7px/s，是「在动」不是「在晃」 */
+  animation: cloudDrift 180s linear infinite;
+}
+
+@keyframes cloudDrift {
+  to {
+    background-position: 1024px 0;
+  }
+}
+
+/* -------------------------------------------------------------- 日月与光晕 */
+
+/*
+ * moon_full.png / sun.png 都没有 alpha，但**背景确实是纯黑**（都是 32×32，解出来角落是
+ * #000000：月盘 14×14、日盘 16×16 都在正中）。所以 screen 一个混合模式就够：黑是恒等元，
+ * 方块自动消失。原版日月本来就是方的，别当渲染出错。
+ *
+ * 光晕必须单独一层：`box-shadow` 只会沿元素的方框扩，放大后是个发光的**方块**（实拍确认）。
+ *
+ * 关键：`.moonWrap` 只负责定位，**不能带 z-index / filter / transform** —— 一旦它自成
+ * stacking context，里面的日月就只能跟「透明背景」混，那块纯黑会原样显出来。
+ * z-index 必须落在混合元素自己身上（云就是这么做的，也正常）；同理混合元素自己头上
+ * 也不能加 filter（带 filter 会进隔离组，同样失去可混的背景）。
+ */
+.moonWrap {
+  position: absolute;
+  top: 2.2rem;
+  right: 8%;
+  width: 60px;
+  height: 60px;
+  display: block;
+}
+
+.moonHalo,
+.sunHalo {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  top: 50%;
+  width: 240px;
+  height: 240px;
+  margin: -120px 0 0 -120px;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  animation: bob 8s ease-in-out infinite;
+}
+
+.moonHalo {
+  background: radial-gradient(
+    circle,
+    rgba(198, 220, 255, 0.3) 0%,
+    rgba(198, 220, 255, 0.13) 34%,
+    rgba(198, 220, 255, 0) 70%
+  );
+}
+
+.sunHalo {
+  background: radial-gradient(
+    circle,
+    var(--halo-sun) 0%,
+    rgba(255, 224, 140, 0.34) 22%,
+    rgba(255, 214, 120, 0.12) 45%,
+    rgba(255, 214, 120, 0) 72%
+  );
+}
+
+.moon,
+.sun {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  mix-blend-mode: screen;
+  animation: bob 8s ease-in-out infinite;
+}
+
+/* 一个主题只留一个天体（display 走变量，DOM 里两个都在） */
+.moon {
+  display: var(--moon-display);
+}
+
+.sun {
+  display: var(--sun-display);
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+/* ---------------------------------------------------------------- 地形层 */
+
+/*
+ * 一层 = 一整块土体（.mass，被 clip-path 切成山形）+ 等宽列（.col，只当刻度尺）。
+ *
+ * 比例基准是 `--unit`（一格多少 px，组件按 UNIT 写进来）。**一格 = 一列 = 一张贴图**，
+ * 三者对齐之后：贴图不会被横向拉长、相邻列的贴图相位天然对齐（列宽正好一个周期）、
+ * 轮廓的每一个台阶都恰好是一个整数格宽（真正的 MC 地形不会把方块切一半）。
+ * 一层的宽度 = `--cols × --unit` = 2560px，比视口宽，多出来的由 .heroBanner 的 overflow 裁掉。
+ */
+.ridge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  z-index: 1;
+}
+
+/* 远景：只抬轮廓不抬底边（见 .mass 的注释）。蓝灰色的雾气同时压暗 + 去饱和，
+   越远越像剪影；白天则反过来，往白里推成大气透视。 */
+.ridgeBack {
+  --shade: var(--shade-back);
+}
+
+/*
+ * 近景：压暗走 `--shade` 叠色，**不能用 `filter: brightness()`** —— 火把和灯笼是它的
+ * 子节点，滤镜会把它们一起压暗（第一版就是这样，火把在实拍里暗得几乎看不见）。
+ * 这里的 drop-shadow 只描一条上沿，顺便把火把、草色顶边从天空上拎起来。
+ */
+.ridgeFront {
+  --shade: var(--shade-front);
+  filter: drop-shadow(0 -2px 0 var(--ridge-edge));
+}
+
+/*
+ * 一整座山的土体。两层贴图，从上到下：
+ * - `--shade` 罩色（夜里压暗 / 白天提亮发灰），只压背景不碰火把；
+ * - 原版泥土，按 `--unit` 平铺 —— 一格一张贴图，相位全局一致，列与列之间没有错缝。
+ * 轮廓由组件算出来的 clip-path 切，底边恒在地平线上，山体内部不可能漏出天空。
+ * 高度是 `--max × --unit`（整数格），所以竖直方向的贴图相位也落在格线上。
+ */
+.mass {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: calc(var(--cols) * var(--unit));
+  height: calc(var(--max) * var(--unit));
+  background-image: linear-gradient(var(--shade), var(--shade)), url('/mc/blocks/dirt.png');
+  background-repeat: no-repeat, repeat;
+  background-size: 100% 100%, var(--unit) var(--unit);
+  background-position: 0 0, 0 0;
+  image-rendering: pixelated;
+}
+
+/*
+ * 一列。只负责两件事：占满一格宽（`flex: 0 0 var(--unit)`，所以「一列 = 一格 = 一张贴图」）
+ * 与用 --blocks 标出这一列有几格高 —— 草色顶边与火把灯笼都挂在它的顶边上。
+ * 土体不画在这里：画在列上的话每列各自从自己左边缘起铺贴图，列与列之间会有竖向错缝。
+ */
+.col {
+  position: relative;
+  flex: 0 0 var(--unit);
+  height: calc(var(--blocks) * var(--unit));
+}
+
+/*
+ * 顶边那一条草色 = 一格高的 1/4。grass_block_side.png 顶部 4/16 行就是草，元素本身
+ * 只有 unit/4 高，背景按一格平铺，取到的正好是那 4 行 —— 不用另裁一张图，也不会有插值。
+ * 它代表**这一列最上面那个草方块的侧面顶沿**，所以：草色只出现在暴露方块的顶边，
+ * 下面的身体是泥土（贴图下半 12/16 行本来就是泥土），再往下不会有石头。
+ */
+.colGrass {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--unit) / 4);
+  background-image: url('/mc/blocks/grass_block_side.png');
+  background-size: var(--unit) var(--unit);
+  background-repeat: repeat-x;
+  image-rendering: pixelated;
+}
+
+/* ------------------------------------------------------------ 火把与灯笼 */
+
+/*
+ * 立在方块顶面上：槽位的底边就是这一列的顶边，槽位本身**一格见方**。
+ * 盒子恒等于一格 —— 所以「灯笼和火把比草方块还大」在结构上不可能发生；
+ * 贴图按 1:1 铺进这个盒子，火把本体（贴图里 x7..9 / y6..16 那 2×10 个像素、
+ * 即 0.625 格高）与灯笼本体（6×7 像素）自然就是原版比例。
+ */
+.propSlot {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: block;
+  width: var(--unit);
+  height: var(--unit);
+  /* 光晕要溢出去不被裁 */
+  overflow: visible;
+}
+
+.propSlot::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--unit) * -1);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 201, 102, 0.5) 0%,
+    rgba(255, 170, 48, 0.16) 45%,
+    rgba(255, 170, 48, 0) 72%
+  );
+  animation: flicker 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes flicker {
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+
+  28% {
+    opacity: 1;
+  }
+
+  52% {
+    opacity: 0.62;
+  }
+
+  76% {
+    opacity: 0.92;
+  }
+}
+
+.torch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+/*
+ * 灯笼贴图是**动画贴图**：16×48 竖排 3 帧，mcmeta 里 frametime=8 tick
+ * （8/20 s = 0.4s 一帧）。贴图按一格宽、三格高 1:1 铺进球（3 帧 × 1 格），
+ * 用 background-position 每次跳一格翻帧，时序复刻原版，不需要 JS。
+ */
+.lantern {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-image: url('/mc/blocks/lantern.png');
+  background-size: 100% calc(var(--unit) * 3);
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  image-rendering: pixelated;
+  animation: lanternFrames 1.2s steps(1, end) infinite;
+}
+
+@keyframes lanternFrames {
+  0% {
+    background-position: 0 0;
+  }
+
+  33.33% {
+    background-position: 0 calc(var(--unit) * -1);
+  }
+
+  66.66% {
+    background-position: 0 calc(var(--unit) * -2);
+  }
+
+  100% {
+    background-position: 0 0;
+  }
+}
+
+/* ------------------------------------------------------------ 标题与海报 */
+
+.logoRow {
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: 0.05s;
 }
 
 .schoolLogo {
@@ -40,11 +520,19 @@
   display: block;
 }
 
+.titleWrap {
+  position: relative;
+  display: inline-block;
+}
+
 .title {
+  position: relative;
   margin: 0.5rem 0 0.25rem;
+  font-family: Minecraft, Minercraftory, sans-serif;
   font-size: clamp(2rem, 5vw, 3.25rem);
-  color: #fff;
-  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.55);
+  letter-spacing: 0.03em;
+  color: var(--hero-fg);
+  text-shadow: var(--title-shadow);
 }
 
 .minecraftFont {
@@ -52,11 +540,96 @@
   letter-spacing: 0.03em;
 }
 
+/*
+ * 附魔流光：把原版 enchanted_glint_item.png 当文字填充再平移，就是 MC 里附魔物品
+ * 那层走动的紫光。
+ * 混合模式必须跟着字色走：深色主题是**白字**，白字上 screen 叠深紫几乎不变，得把贴图
+ * 反相后 multiply（往暗里压）；浅色主题是深字，反过来直接 screen（往亮里推）。
+ * 反相会把紫色翻成黄绿，再 hue-rotate 180° 转回紫。
+ * 用 ::after + attr(data-text) 而不是多写一层 DOM：innerText 不会混进重复文案。
+ */
+.title::after {
+  content: attr(data-text);
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  white-space: nowrap;
+  padding: inherit;
+  background-image: url('/mc/misc/enchanted_glint_item.png');
+  background-repeat: repeat;
+  background-size: 72px 72px;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+  filter: var(--glint-filter);
+  mix-blend-mode: var(--glint-blend);
+  opacity: var(--glint-opacity);
+  pointer-events: none;
+  animation: glintSweep 2.8s linear infinite;
+}
+
+@keyframes glintSweep {
+  to {
+    background-position: 72px 0;
+  }
+}
+
+/*
+ * 主菜单旁边那句斜着的小字。三个轮播，纯 CSS：
+ * 基准态 opacity 0，关键帧里前 30% 亮着 → 延迟期间不可见，不会三个一起挤出来。
+ *
+ * 位置挂在标题**右侧**而不是下边：标题居中，它两侧本来就有富余；
+ * 放到下边会正好压在副标题那行上（实拍确认过，两个主题都撞）。
+ * `bottom` 不能太小：这行小字是 -12° 斜着的，旋转后的外接框比本身高出一截，
+ * 贴住标题框下沿时框底会探进副标题 —— verify/site-check.cjs 量矩形相交，是它抓出来的。
+ * 1.1rem 只剩 1px 余量，留到 1.5rem（实测 1440→760px 五档都留 ~8px）。
+ * 字色也走变量：白天是浅底，MC 那种亮黄完全压不住，换成深琥珀 + 浅描边。
+ */
+.splash {
+  position: absolute;
+  left: calc(100% + 0.5rem);
+  bottom: 1.5rem;
+  width: 10rem;
+  height: 1.7rem;
+  transform: rotate(-12deg);
+  font-family: Minecraft, Minercraftory, sans-serif;
+  font-size: 0.95rem;
+  color: var(--splash-fg);
+  text-shadow: var(--splash-shadow);
+  pointer-events: none;
+}
+
+.splash span {
+  position: absolute;
+  inset: 0;
+  white-space: nowrap;
+  opacity: 0;
+  animation: splashCycle 12s linear infinite;
+  animation-delay: calc(var(--i) * 4s);
+}
+
+@keyframes splashCycle {
+  0%,
+  30% {
+    opacity: 1;
+  }
+
+  33.4%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ 正文 */
+
 .subtitle {
   margin: 0 auto 0.75rem;
   max-width: 52rem;
   font-size: 1rem;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--hero-fg-soft);
+  text-shadow: var(--hero-shadow);
 }
 
 .lead {
@@ -64,7 +637,10 @@
   max-width: 46rem;
   font-size: 0.95rem;
   line-height: 1.8;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--hero-fg-body);
+  /* 天上还有云和烟花扫过，给正文压一层晕兜住可读性（夜间是暗晕、白天是亮晕） */
+  text-shadow: var(--hero-shadow);
+  text-wrap: pretty;
 }
 
 .buttons {
@@ -84,7 +660,7 @@
   text-decoration: none;
 }
 
-/* 「放烟花」按钮里的 TNT 引信图标 */
+/* 「放烟花」按钮里的火箭图标 */
 .celebrateIcon {
   height: 16px;
   width: 16px;
@@ -100,8 +676,8 @@
   flex-wrap: wrap;
   margin: 1.75rem auto 0;
   max-width: 52rem;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.35);
+  border: 2px solid var(--panel-line);
+  background: var(--panel-bg);
 }
 
 .fact {
@@ -111,38 +687,142 @@
 }
 
 .fact + .fact {
-  border-left: 2px solid rgba(255, 255, 255, 0.18);
+  border-left: 2px solid var(--panel-line);
 }
 
 .fact dt {
   font-size: 0.72rem;
   letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--panel-fg-soft);
 }
 
 .fact dd {
   margin: 0.2rem 0 0;
   font-family: Minecraft, Minercraftory, sans-serif;
   font-size: 0.9rem;
-  color: #fff;
+  color: var(--panel-fg);
+}
+
+/* ---------------------------------------------------------------- 物品栏 */
+
+.hotbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.6rem;
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: 0.47s;
 }
 
 /*
- * 入场动画：hero 里六块内容依次淡入上浮，各带一点延迟做次序感。
+ * 原版快捷栏贴图 182×22：x=0 左黑边、x=1..180 是 9 个格子、x=181 右黑边，格子 20×20。
+ * 我们只出 `--slots` 格（= 社团数），宽 = (1 + n×20 + 1) × 2，格子几何照原版放大 2 倍。
+ *
+ * 贴图里没有「第 7 格右边缘」这种东西（x=141 处是第 8 格的起始），所以右黑边必须
+ * **另取贴图第 181 列**补在右边缘：`::after` 把同一张贴图平移 -362px（= 181 × 2）
+ * 贴在一个 2px 宽的窄条上，取到的正好是那一列。少了它框的右边就是断的。
+ */
+.hotbarFrame {
+  position: relative;
+  width: calc(var(--slots) * 40px + 4px);
+  height: 44px;
+  background-image: url('/mc/gui/hotbar.png');
+  background-repeat: no-repeat;
+  background-size: 364px 44px;
+  image-rendering: pixelated;
+  /* 贴图本身是半透明深色，加一层投影把整个 HUD 从地形上拎起来 */
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+}
+
+.hotbarFrame::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 44px;
+  background-image: url('/mc/gui/hotbar.png');
+  background-repeat: no-repeat;
+  background-size: 364px 44px;
+  background-position: -362px 0;
+  image-rendering: pixelated;
+}
+
+.hotSlot {
+  position: absolute;
+  top: 2px;
+  left: calc(2px + var(--i) * 40px);
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 2px;
+  transition:
+    transform 0.18s ease,
+    filter 0.18s ease;
+}
+
+.hotSlot:hover,
+.hotSlot:focus-visible {
+  z-index: 2;
+  transform: scale(1.1);
+  filter: brightness(1.3) drop-shadow(0 0 7px rgba(255, 238, 168, 0.9));
+}
+
+/* 社团 logo 既有照片也有矢量徽章，一律走默认平滑，不用 pixelated */
+.hotIcon {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.hotName {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.hotSlot:hover .hotName,
+.hotSlot:focus-visible .hotName {
+  opacity: 1;
+}
+
+/*
+ * HUD 底下那行提示。字色跟着主题走（夜里白字 / 白天深字），不透明度是量出来的：
+ * verify/probe-home-colors.cjs 按最坏情况（云最密处、贴地雾之上）两个主题各算一遍，
+ * 都取「对比度更低的那一侧」当结果；这条是 11.8px 的小字，按 AA 得 ≥ 4.5。
+ */
+.hotHint {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--hero-hint);
+  text-shadow: var(--hero-shadow);
+}
+
+/* ------------------------------------------------------------ 入场与降级 */
+
+/*
+ * 入场动画：hero 里几块内容依次淡入上浮，各带一点延迟做次序感。
  * 只用 transform/opacity（合成层能跑完），不动布局属性，避免入场时重排。
  * `both` 让延迟期间保持起始态，不会先闪一下再动。
  */
-.logoRow,
 .title,
 .subtitle,
 .lead,
 .buttons,
 .facts {
   animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
-}
-
-.logoRow {
-  animation-delay: 0.05s;
 }
 
 .title {
@@ -179,24 +859,88 @@
 
 @media screen and (max-width: 996px) {
   .heroBanner {
-    padding: 2rem 1rem;
+    /* 只收横向内边距；下方那截必须留给山峦（见 .heroBanner 的注释），窄屏尤其不能让 */
+    padding: clamp(1.5rem, 4vh, 3rem) 1rem clamp(9.5rem, 17vh, 11rem);
   }
 
   .fact + .fact {
     border-left: none;
-    border-top: 2px solid rgba(255, 255, 255, 0.18);
+    border-top: 2px solid var(--panel-line);
   }
 }
 
-/* 系统要求减少动效：入场、草方块流动一律停掉（花圃的摇摆在它自己的样式里处理） */
+@media screen and (max-width: 700px) {
+  /* 窄屏标题几乎占满一行，斜着的小字会顶出视口，直接收掉 */
+  .splash {
+    display: none;
+  }
+
+  /* 竖屏手机上正文会比视口高：逐块收紧行距 / 间距，好让山峦也在首屏里露出来 */
+  .subtitle {
+    margin-bottom: 0.5rem;
+    font-size: 0.92rem;
+  }
+
+  .lead {
+    margin-bottom: 1.1rem;
+    font-size: 0.88rem;
+    line-height: 1.7;
+  }
+
+  /* 事实条在窄屏会竖着堆成三条，内边距不收缩的话它一项就能吃掉 200px */
+  .facts {
+    margin-top: 1.2rem;
+  }
+
+  .fact {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .hotbar {
+    margin-top: 1.1rem;
+  }
+
+  .moonWrap {
+    width: 42px;
+    height: 42px;
+    top: 1.4rem;
+    right: 6%;
+  }
+
+  .moonHalo,
+  .sunHalo {
+    width: 170px;
+    height: 170px;
+    margin: -85px 0 0 -85px;
+  }
+}
+
+/* 系统要求减少动效：云、星、月、火把、灯笼、流光、海报轮播、入场一律停掉 */
 @media screen and (prefers-reduced-motion: reduce) {
-  .heroBanner,
-  .logoRow,
+  .clouds,
+  .star,
+  .moon,
+  .sun,
+  .moonHalo,
+  .sunHalo,
+  .propSlot::after,
+  .lantern,
+  .splash span,
+  .title::after,
   .title,
   .subtitle,
   .lead,
   .buttons,
-  .facts {
+  .facts,
+  .hotbar,
+  .logoRow,
+  .hotSlot {
     animation: none;
+    transition: none;
+  }
+
+  /* 轮播停掉时只留第一句，否则三句会叠在一起 */
+  .splash span:first-child {
+    opacity: 1;
   }
 }
