@@ -1,7 +1,8 @@
-// Cloudflare Workers 部署配置（静态资产 + 一个极薄的 Worker 入口）。
+// Cloudflare Workers 部署配置（静态资产 + Worker 入口 + D1 + R2）。
 //
 // 依据的官方文档（2026-10-13 查）：
 // - 静态资产总览        https://developers.cloudflare.com/workers/static-assets/
+// - 配置与绑定          https://developers.cloudflare.com/workers/static-assets/binding/
 // - SSG + 自定义 404    https://developers.cloudflare.com/workers/static-assets/routing/static-site-generation/
 // - html_handling 语义  https://developers.cloudflare.com/workers/static-assets/routing/advanced/html-handling/
 // - Docusaurus 专页     https://developers.cloudflare.com/workers/framework-guides/web-apps/more-web-frameworks/docusaurus/
@@ -18,10 +19,10 @@
 // 3. `not_found_handling: "404-page"` —— Docusaurus 会生成 `build/404.html`，
 //    命中不到资产时回它，且**带 404 状态码**（不是 SPA 那种 200 + index.html）。
 //
-// `run_worker_first: ["/api/*"]` 是给后续动态内容留的闸门：默认情况下
-// compatibility_date ≥ 2025-04-01 时，**导航请求（Sec-Fetch-Mode: navigate）不会进 Worker**，
-// 直接由静态资产处理（省计费调用）。所以浏览器直接打开 `/api/xxx` 会拿到 404.html 而不是 API 响应。
-// 把 `/api/*` 列进 `run_worker_first`，这些路径就必定先过 Worker 的 fetch。
+// `run_worker_first: ["/api/*"]` 是必需的：默认（`false`）是「先找静态资产，找不到才跑 Worker」，
+// 而 compat date ≥ 2025-04-01 起**导航请求**（`Sec-Fetch-Mode: navigate`）在找不到资产时
+// 也**不会**进 Worker，直接按 `not_found_handling` 回 404 页。不把 `/api/*` 列进去，
+// 浏览器直接打开 `/api/health` 会拿到 404.html 而不是 JSON（curl 不带那个头，测不出差别）。
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "club-party-website",
@@ -33,5 +34,31 @@
     "html_handling": "drop-trailing-slash",
     "not_found_handling": "404-page",
     "run_worker_first": ["/api/*"]
+  },
+  // 报名数据。建表：`npm run db:migrate:local`（本地模拟）/ `db:migrate:remote`（线上，需凭据）。
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "club-party-db",
+      "database_id": "98c0496a-4c35-41d0-b1c5-cfa57e4db351"
+    }
+  ],
+  // 皮肤文件。对象键 = Minecraft 游戏 id + 学号后两位 + ".png"（见 worker/skin.ts）。
+  // 桶不开公共访问，取图一律经 Worker 的 `/api/skins/<key>`。
+  "r2_buckets": [
+    {
+      "binding": "SKINS",
+      "bucket_name": "club-party"
+    }
+  ],
+  // 人机校验（Turnstile，见 worker/turnstile.ts）。
+  // 密钥**不进配置**：线上 `wrangler secret put TURNSTILE_SECRET`，本地由 `npm run cf:dev`
+  // 用 `wrangler dev --var` 带上（刻意不用 `.dev.vars`，理由见 worker/env.d.ts）。这里只放
+  // 可以公开的调项。
+  "vars": {
+    // 本站域名（逗号分隔，不带协议）。**留空 = 不核对域名归属**：widget 那边本来就只在
+    // 自己注册过的域名上出票，这一层是「万一」用的。填了之后服务端会比对 siteverify 回来的
+    // hostname，对不上就 403。注意只在真实密钥下生效（测试密钥回的 hostname 恒为 example.com）。
+    "TURNSTILE_HOSTNAMES": ""
   }
 }
