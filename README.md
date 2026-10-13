@@ -136,7 +136,9 @@ club-party-website/
 }
 ```
 
-顶层的 `activity` 放活动名、学校名与校徽，首页的 hero 区读的是它。
+顶层的 `activity` 放活动名、全称与社团数，首页 hero 区读的是 `name` / `fullName` / `clubCount`。
+`school` 与 `schoolLogo` 目前无人引用（首页那枚校徽已按需求撤掉），字段与
+`static/img/sdtbu-logo.png` 先留着备用。
 
 ### 素材状态
 
