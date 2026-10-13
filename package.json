@@ -17,9 +17,13 @@
     "check:md": "node scripts/check-md-residue.mjs",
     "gen:clubs": "node scripts/gen-club-placeholders.mjs && node scripts/gen-club-docs.mjs",
     "cf:types": "wrangler types worker/worker-configuration.d.ts --include-runtime false",
-    "cf:preview": "npm run build && wrangler dev",
+    "cf:preview": "npm run build && wrangler dev --var TURNSTILE_SECRET:1x0000000000000000000000000000000AA",
+    "cf:dev": "wrangler dev --ip 0.0.0.0 --port 3000 --var TURNSTILE_SECRET:1x0000000000000000000000000000000AA",
     "cf:dry-run": "wrangler deploy --dry-run",
-    "cf:deploy": "npm run build && wrangler deploy"
+    "cf:deploy": "npm run build && wrangler deploy",
+    "db:migrate:local": "wrangler d1 execute club-party-db --local --file=worker/schema.sql",
+    "db:migrate:remote": "wrangler d1 execute club-party-db --remote --file=worker/schema.sql",
+    "db:query:local": "wrangler d1 execute club-party-db --local --command=\"SELECT id, student_id, name, class_name, mc_id, skin_key, created_at FROM participants ORDER BY created_at DESC\""
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",
@@ -30,7 +34,8 @@
     "clsx": "^2.0.0",
     "prism-react-renderer": "^2.3.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "skinview3d": "^3.4.2"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261013.1",
