@@ -1,0 +1,37 @@
+// Cloudflare Workers 部署配置（静态资产 + 一个极薄的 Worker 入口）。
+//
+// 依据的官方文档（2026-10-13 查）：
+// - 静态资产总览        https://developers.cloudflare.com/workers/static-assets/
+// - SSG + 自定义 404    https://developers.cloudflare.com/workers/static-assets/routing/static-site-generation/
+// - html_handling 语义  https://developers.cloudflare.com/workers/static-assets/routing/advanced/html-handling/
+// - Docusaurus 专页     https://developers.cloudflare.com/workers/framework-guides/web-apps/more-web-frameworks/docusaurus/
+//
+// 三条决定，都是拿本站的 build 产物量出来的，不是照抄模板：
+//
+// 1. `directory: "./build"` —— Docusaurus 的输出目录（`.gitignore` 里已忽略）。
+// 2. `html_handling: "drop-trailing-slash"` —— **不能**用默认的 `auto-trailing-slash`。
+//    Docusaurus 生成的站内链接是 `href=/docs/intro`（无尾斜杠），而产物文件是
+//    `build/docs/intro/index.html`（目录 + index）。默认值遇到 `/docs/intro` 会认成
+//    「folder 但缺尾斜杠」→ **307 跳到 `/docs/intro/`**，于是站内每一次点击都多一跳。
+//    `drop-trailing-slash` 下 `/docs/intro` 直接 200 命中 `docs/intro/index.html`，
+//    与产物里的链接写法逐一对齐（`/docs/intro/` 反过来 307 回无斜杠）。
+// 3. `not_found_handling: "404-page"` —— Docusaurus 会生成 `build/404.html`，
+//    命中不到资产时回它，且**带 404 状态码**（不是 SPA 那种 200 + index.html）。
+//
+// `run_worker_first: ["/api/*"]` 是给后续动态内容留的闸门：默认情况下
+// compatibility_date ≥ 2025-04-01 时，**导航请求（Sec-Fetch-Mode: navigate）不会进 Worker**，
+// 直接由静态资产处理（省计费调用）。所以浏览器直接打开 `/api/xxx` 会拿到 404.html 而不是 API 响应。
+// 把 `/api/*` 列进 `run_worker_first`，这些路径就必定先过 Worker 的 fetch。
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "club-party-website",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-13",
+  "assets": {
+    "directory": "./build",
+    "binding": "ASSETS",
+    "html_handling": "drop-trailing-slash",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*"]
+  }
+}

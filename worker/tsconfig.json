@@ -1,0 +1,29 @@
+// Worker 单独一份 TS 工程：它的运行时是 workerd，不是浏览器，跟站点那份不能共用 ——
+// 根 tsconfig 走 `@docusaurus/tsconfig` 带 DOM lib，与 workers 的运行时类型定义会撞
+// （两边都声明 Request / Response / WebSocket 等全局）。所以根 tsconfig.json 的
+// `exclude` 里排掉了 `worker`，`npm run typecheck` 跑两份 tsc。
+//
+// 类型有两个来源，各管一段，别混：
+// - 运行期全局（Request / Response / ExportedHandler / Fetcher …）来自
+//   `@cloudflare/workers-types`（devDependency，按兼容日期发版，不进仓库）；
+// - `Env`（绑定表）来自 `worker-configuration.d.ts` —— `npm run cf:types` 从
+//   wrangler.jsonc 现推出来、**入库**（`--include-runtime false` 只出这十几行；
+//   带上运行期类型那份是 624 KB，不值得当常驻 blob）。改了 wrangler.jsonc 的
+//   bindings 就重跑一次；`wrangler types … --check` 可以只校验不写。
+//
+// `types: []` 是为了不把根目录的 @types/* 自动拉进来。
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "lib": ["esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "types": ["@cloudflare/workers-types"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true
+  },
+  "include": ["./**/*.ts"]
+}

@@ -4,6 +4,9 @@
 # Production
 /build
 
+# Cloudflare Workers 本地状态（wrangler dev / types 的缓存，不入库）
+/.wrangler
+
 # Generated files
 .docusaurus
 .cache-loader
