@@ -1,0 +1,86 @@
+/* 「小伙伴们」名单页：一格一张卡片，卡片语言与社团风采卡片一致
+   （minecraft-react-ui 的深色 GUI 变量，固定深色不随主题翻转，所以卡片里要自己声明 color）。 */
+
+.page {
+  padding: 2.5rem 0 4rem;
+}
+
+.head {
+  max-width: 46rem;
+  margin-bottom: 1.75rem;
+}
+
+.title {
+  font-family: Minecraft, Minercraftory, var(--ifm-font-family-base);
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.6rem;
+}
+
+.lead {
+  color: var(--ifm-color-emphasis-700);
+  margin-bottom: 1rem;
+}
+
+.lead a {
+  text-decoration: underline;
+}
+
+.note {
+  padding: 1rem 1.2rem;
+  color: var(--ifm-color-emphasis-700);
+  background: var(--ifm-background-surface-color);
+  border-left: 4px solid var(--ifm-color-emphasis-300);
+}
+
+.noteError {
+  border-left-color: var(--ifm-color-danger);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 1.1rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 0.7rem 0.7rem 0.9rem;
+  background: var(--background-color, #23232a);
+  color: var(--text-color, #fff);
+  box-shadow:
+    inset 0 -3px 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset -3px 0 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 0 3px 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4)),
+    inset 3px 0 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
+}
+
+.meta {
+  padding: 0 0.15rem;
+}
+
+.mcId {
+  margin: 0;
+  font-family: Minecraft, Minercraftory, var(--ifm-font-family-base);
+  font-size: 1rem;
+  color: var(--text-color, #fff);
+  overflow-wrap: anywhere;
+}
+
+.realName {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: var(--secondary-color, #d0d1d4);
+  overflow-wrap: anywhere;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}

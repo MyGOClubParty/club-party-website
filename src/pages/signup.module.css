@@ -1,0 +1,250 @@
+/* 活动报名页。
+ *
+ * 配色刻意沿用 minecraft-react-ui 的深色 GUI 变量（和社团卡片同一套语言，
+ * 那些变量在 :root 里是固定的深色，不随主题翻转），所以**每个面板都要自己声明 color** ——
+ * 库把 html 的字色设成 #fff 之后站点又改回了 Infima 正文色，
+ * 面板里漏写 color 就会在浅色主题下变成深字压深底。 */
+
+.page {
+  padding: 2.5rem 0 4rem;
+}
+
+.head {
+  max-width: 48rem;
+  margin: 0 auto 1.6rem;
+}
+
+.title {
+  font-family: Minecraft, Minercraftory, var(--ifm-font-family-base);
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.6rem;
+}
+
+.lead {
+  color: var(--ifm-color-emphasis-700);
+  margin-bottom: 0;
+}
+
+.panel {
+  max-width: 48rem;
+  margin: 0 auto 1.25rem;
+  padding: 1.2rem 1.35rem 1.4rem;
+  background: var(--background-color, #23232a);
+  color: var(--text-color, #fff);
+  box-shadow:
+    inset 0 -3px 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset -3px 0 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 0 3px 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4)),
+    inset 3px 0 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
+}
+
+.panelTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  letter-spacing: 0.03em;
+}
+
+.panelTitle img {
+  width: 20px;
+  height: 20px;
+  image-rendering: pixelated;
+}
+
+/* 可选标记：`<span class={styles.optional}>` */
+.optional {
+  font-size: 0.82rem;
+  color: var(--secondary-color, #d0d1d4);
+  opacity: 0.85;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.fieldWide {
+  grid-column: 1 / -1;
+}
+
+.label {
+  font-size: 0.9rem;
+  color: var(--secondary-color, #d0d1d4);
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--secondary-color, #d0d1d4);
+  opacity: 0.75;
+}
+
+/* 人机校验（Turnstile）的落点。不去改 widget 自己的尺寸：normal 就是 300x65（flexible 会
+   填满容器，看着更像「本站自己的东西」，但拉宽之后里面的内容还是居中一小块，不值当）。
+   这里只把高度先占住 —— 脚本几百毫秒后才到，不占位的话页面会跳一下。 */
+.turnstileBox {
+  min-height: 65px;
+}
+
+.input {
+  width: 100%;
+}
+
+/* 组件库的 `.Input::placeholder` 是 `rgb(117,117,117) / opacity: .6`，压在这个输入框固定的
+   #484848 底上实测只有 **1.80:1**（两种主题的输入框底色相同，都是 #484848）——太虚。
+   占位符里写着「5-12 位数字」这类要求，属于有效信息，按 AA 正文标准要 ≥ 4.5:1；
+   实测该底色上灰色至少要 rgb(182,182,182)，取 #b8b8b8 得 **4.61:1**，
+   同时明显淡于真正输入的白字，仍读得出「这是提示不是内容」。 */
+.input::placeholder {
+  color: #b8b8b8;
+  opacity: 1;
+}
+
+/* 皮肤上传：浏览器自带的 file input 用 ::file-selector-button 换掉那颗按钮 */
+.fileRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem;
+}.fileInput {
+  flex: 1 1 18rem;
+  min-width: 0;
+  font-family: Minecraft, Minercraftory, var(--ifm-font-family-base);
+  font-size: 0.9rem;
+  color: var(--text-color, #fff);
+}
+
+.fileInput::file-selector-button {
+  margin-right: 0.8rem;
+  padding: 6px 14px;
+  font-family: Minecraft, Minercraftory, var(--ifm-font-family-base);
+  font-size: 0.9rem;
+  color: var(--text-color, #fff);
+  background-color: var(--midground-color, #484848);
+  border: none;
+  box-shadow:
+    inset 0 -3px 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset -3px 0 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 0 3px 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4)),
+    inset 3px 0 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
+  cursor: pointer;
+}
+
+/* 「或者」分隔条：上传文件与 LittleSkin TID 是两个等价入口，视觉上也要断开 */
+.orRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.85rem 0;
+  font-size: 0.78rem;
+  color: var(--secondary-color, #d0d1d4);
+  opacity: 0.7;
+}
+
+.orRow::before,
+.orRow::after {
+  content: '';
+  flex: 1 1 auto;
+  height: 1px;
+  background-color: var(--bezel-color, rgba(0, 0, 0, 0.4));
+}
+
+/* 提示文案里的外链：面板是固定的深色底，链接用面板自己的前景色 + 下划线 */
+.hint a {
+  color: var(--select-color, #fff);
+  text-decoration: underline;
+}
+
+/* 选好文件后的小预览：2D 像素头像，跟「小伙伴们」页面上没轮到 3D 时是同一个组件 */
+.preview {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+}
+
+.previewFrame {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  flex: 0 0 auto;
+  background-color: var(--midground-color, #484848);
+  box-shadow:
+    inset 0 -3px 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset -3px 0 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 0 3px 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4)),
+    inset 3px 0 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
+}
+
+.previewHead {
+  width: 52px;
+  height: 52px;
+  image-rendering: pixelated;
+}
+
+.previewMeta {
+  font-size: 0.82rem;
+  color: var(--secondary-color, #d0d1d4);
+  min-width: 0;
+  word-break: break-all;
+}
+
+.keyName {
+  color: var(--select-color, #fff);
+  font-family: Minecraft, Minercraftory, var(--ifm-font-family-base);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  max-width: 48rem;
+  margin: 0 auto;
+}
+
+.actionsNote {
+  font-size: 0.8rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.status {
+  max-width: 48rem;
+  margin: 1rem auto 0;
+  padding: 0.7rem 0.95rem;
+  font-size: 0.92rem;
+}
+
+.statusError {
+  color: #ffdede;
+  background: rgba(255, 131, 131, 0.16);
+  border-left: 4px solid var(--error-color, #ff8383);
+}
+
+.statusDone {
+  color: #e2ffe9;
+  background: rgba(137, 255, 178, 0.14);
+  border-left: 4px solid var(--success-color, #89ffb2);
+}
+
+.statusDone a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

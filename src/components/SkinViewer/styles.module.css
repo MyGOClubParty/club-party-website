@@ -1,0 +1,70 @@
+/* SKIN 卡片里的皮肤视图。
+ *
+ * 面板配色走 minecraft-react-ui 的深色 GUI 变量（:root 里是固定的深色，不随主题翻转，
+ * 与社团卡片是同一套语言），石头底纹则按主题压一层罩子 —— 深色压暗、浅色提亮，
+ * 免得同一张 16px 石头贴图在浅色页面上糊成一块脏灰。 */
+
+.viewer {
+  --skin-veil: rgba(250, 251, 252, 0.9);
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  color: var(--text-color, #fff);
+  background-color: var(--background-color, #23232a);
+  background-image: linear-gradient(var(--skin-veil), var(--skin-veil)), url('/mc/blocks/stone.png');
+  background-size: auto, 96px 96px;
+  box-shadow:
+    inset 0 -3px 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset -3px 0 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 0 3px 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4)),
+    inset 3px 0 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
+}
+
+[data-theme='dark'] .viewer {
+  --skin-veil: rgba(17, 21, 26, 0.88);
+}
+
+/* 3D 结果的落脚点。
+ *
+ * 全站只有一个离屏 WebGL 舞台（见 index.tsx 顶部），渲染完由组件 drawImage 到这张 2D 画布上。
+ * 绕这一道是为了两件事：① 上下文恒为 1 个，名单多长都不会撞 Chrome 的 16 个上限；
+ * ② 2D 画布能读出像素（`getImageData`），「画布上到底有没有东西」就成了可断言的事实，
+ * WebGL 画布在 preserveDrawingBuffer 关掉之后是读不出来的。 */
+.stageCanvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* 2D 像素头像：兜底用的，一直挂在 DOM 里。
+ * pending（还没轮到渲染）/ blocked（没有 WebGL、皮肤取不回来）时它是唯一的画面；
+ * 一旦画布上有了内容就把它撤掉，免得叠在 3D 上。 */
+.head {
+  width: 46%;
+  height: auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.32));
+}
+
+.viewer[data-mode='live'] .head,
+.viewer[data-mode='idle'] .head {
+  visibility: hidden;
+}
+
+/* 离屏舞台的容器：挪出行外、裁成一像素、不参与合成，但留在 DOM 里 ——
+ * 排查的时候能在开发者工具里直接戳到那块画布。 */
+.stageHost {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}

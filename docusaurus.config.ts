@@ -97,6 +97,9 @@ const config: Config = {
         },
         {to: '/docs/clubs', label: '社团风采', position: 'left'},
         {to: '/blog', label: '活动日志', position: 'left'},
+        // 报名与名单是这次活动真正要人动手的两页，放在左侧最右
+        {to: '/signup', label: '活动报名', position: 'left'},
+        {to: '/participants', label: '小伙伴们', position: 'left'},
         // 右侧按数组顺序从左往右排：「关于」在 GitHub 左边
         {to: '/about', label: '关于', position: 'right'},
         {
