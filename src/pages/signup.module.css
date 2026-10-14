@@ -219,23 +219,48 @@
   color: var(--ifm-color-emphasis-700);
 }
 
+/* 提交结果条。
+ *
+ * **底色必须自己定（不透明），不许靠页面的主题色透出来。** 这条不在深色面板里，而是直接
+ * 贴在页面上，页面底色是跟着主题翻的 —— 早先写成 `rgba(...)` 半透明 + 近白色字，
+ * 在浅色主题下就是「浅绿底 + 近白字」：实测 rgba(137,255,178,.14) 压在白底上得到
+ * rgb(239,255,244)，配 #e2ffe9 只有 **1.03:1**（失败那条 1.09:1），字等于没画。
+ * 深色主题下同样的值看着没问题，所以这个 bug 只在浅色主题露头（截图里那片绿底白字）。
+ *
+ * 改法：底色改成不透明，两种主题各给一套色。这样对比度只由这两行决定，
+ * 跟页面底色彻底脱钩，量一次就作数：浅色 10.74:1 / 9.23:1，深色 13.47:1 / 14.06:1。
+ */
 .status {
   max-width: 48rem;
   margin: 1rem auto 0;
   padding: 0.7rem 0.95rem;
   font-size: 0.92rem;
+  border-left: 4px solid transparent;
 }
 
 .statusError {
-  color: #ffdede;
-  background: rgba(255, 131, 131, 0.16);
-  border-left: 4px solid var(--error-color, #ff8383);
+  color: #7d1420;
+  background: #fdecec;
+  border-left-color: #c62828;
 }
 
 .statusDone {
-  color: #e2ffe9;
-  background: rgba(137, 255, 178, 0.14);
-  border-left: 4px solid var(--success-color, #89ffb2);
+  color: #0d4023;
+  background: #e4f9ec;
+  border-left-color: #2e9e5b;
+}
+
+/* 深色主题：换成深底浅字，左侧竖条仍用组件库的成功/失败色 */
+[data-theme='dark'] .statusError {
+  color: #ffdfe0;
+  background: #2b1216;
+  border-left-color: var(--error-color, #ff8383);
+}
+
+[data-theme='dark'] .statusDone {
+  color: #eafff0;
+  background: #14311f;
+  border-left-color: var(--success-color, #89ffb2);
 }
 
 .statusDone a {
