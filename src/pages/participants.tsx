@@ -13,8 +13,8 @@ import styles from './participants.module.css';
 const DEFAULT_SKIN = '/img/skins/deepseek-npz.png';
 
 type Participant = {
-  name: string;
-  className: string;
+  /** 学院。可能是空串（早于这一列的记录），那就整行不显示，见下面卡片里的判断。 */
+  college: string;
   mcId: string;
   hasSkin: boolean;
   skinUrl: string | null;
@@ -104,19 +104,28 @@ export default function Participants(): ReactNode {
             <ul className={styles.grid} data-participants-state="ready">
               {state.participants.map((person) => (
                 <li
-                  key={`${person.mcId}-${person.registeredAt}-${person.name}`}
+                  key={`${person.mcId}-${person.registeredAt}`}
                   className={styles.card}
                   data-participant={person.mcId}
                   data-has-skin={person.hasSkin}>
                   <SkinViewer
                     skin={person.skinUrl ?? DEFAULT_SKIN}
-                    label={`${person.name}（${person.mcId}）的 Minecraft 皮肤`}
+                    label={`${person.mcId} 的 Minecraft 皮肤`}
                   />
                   <div className={styles.meta}>
-                    <p className={styles.mcId}>{person.mcId}</p>
-                    <p className={styles.realName}>
-                      {person.name} · {person.className}
+                    <p className={styles.mcId} data-participant-mcid>
+                      {person.mcId}
                     </p>
+                    {/*
+                      游戏 ID 下面只写学院 —— 展示口径是主办方定的，姓名与班级不回传也不显示
+                      （见 worker/participants.ts）。老记录这一栏是空串，那就整行不渲染：
+                      空一行比写个「（未知）」更像坏了。
+                    */}
+                    {person.college ? (
+                      <p className={styles.college} data-participant-college>
+                        {person.college}
+                      </p>
+                    ) : null}
                   </div>
                   <div className={styles.tags}>
                     {person.hasSkin ? (

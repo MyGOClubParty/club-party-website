@@ -23,7 +23,9 @@
     "cf:deploy": "npm run build && wrangler deploy",
     "db:migrate:local": "wrangler d1 execute club-party-db --local --file=worker/schema.sql",
     "db:migrate:remote": "wrangler d1 execute club-party-db --remote --file=worker/schema.sql",
-    "db:query:local": "wrangler d1 execute club-party-db --local --command=\"SELECT id, student_id, name, class_name, mc_id, skin_key, created_at FROM participants ORDER BY created_at DESC\""
+    "db:migrate:college:local": "wrangler d1 execute club-party-db --local --file=worker/migrate-add-college.sql",
+    "db:migrate:college:remote": "wrangler d1 execute club-party-db --remote --file=worker/migrate-add-college.sql",
+    "db:query:local": "wrangler d1 execute club-party-db --local --command=\"SELECT id, student_id, name, college, class_name, mc_id, skin_key, created_at FROM participants ORDER BY created_at DESC\""
   },
   "dependencies": {
     "@docusaurus/core": "3.10.2",

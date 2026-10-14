@@ -1,0 +1,21 @@
+-- 给**已经建好**的 participants 表补上 `college` 列（2026-10-14）。
+--
+-- 为什么要单独一份：`worker/schema.sql` 里全是 `CREATE TABLE IF NOT EXISTS`，表已经存在时
+-- 它整句跳过 —— 也就是说对线上那张表跑 `npm run db:migrate:remote` 什么都不会发生，
+-- 而 Worker 一旦开始 INSERT `college`，老表就会报 `no such column: college`。
+-- SQLite 的 `ALTER TABLE ADD COLUMN` 又不支持 `IF NOT EXISTS`，所以升级路径只能是
+-- 「单独一条语句、只跑一次」，这份文件就是那条语句。
+--
+-- 用法（每张已存在的库跑一次）：
+--   npm run db:migrate:college:local    # 容器里的模拟库
+--   npm run db:migrate:college:remote   # 线上 D1（需要 Cloudflare 凭据）
+--
+-- `DEFAULT ''` 是必须的：NOT NULL 的新列得给老行一个值，SQLite 才肯加上去。
+-- 于是已有记录（比如第一位报名的同学）学院一栏是空串，名单页遇到空值就不显示这一行 ——
+-- 不猜、也不拿班级去顶，等本人下次更新：
+--   UPDATE participants SET college = '<学院全称>' WHERE student_id = '<学号>';
+--
+-- 重复执行会报 `duplicate column name: college`。这是**设计如此**：本文件是一次性的，
+-- 那句话就是「已经升过了」的信号，不是需要修的错。
+
+ALTER TABLE participants ADD COLUMN college TEXT NOT NULL DEFAULT '';

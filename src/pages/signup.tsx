@@ -21,7 +21,12 @@ import styles from './signup.module.css';
 const MAX_SKIN_BYTES = 5 * 1024 * 1024;
 
 const MC_ID_RE = /^[A-Za-z0-9_]{1,32}$/;
-const STUDENT_ID_RE = /^\d{4,20}$/;
+/**
+ * 学号是本校的 **10 位数字**（`2026010101`）。这份正则只用来算「皮肤文件名预览」
+ * （见下面的 `plannedKey`），不是校验 —— 真正的判定在 worker/register.ts，
+ * 那边的 `STUDENT_ID_RE` 跟这里必须是同一个形状。
+ */
+const STUDENT_ID_RE = /^\d{10}$/;
 
 /**
  * LittleSkin 皮肤 TID 的形状，与 `worker/littleskin.ts` 的 `TID_RE` 必须一致。
@@ -110,8 +115,14 @@ function loadTurnstileScript(): Promise<void> {
 /** widget 的三种状态：`loading` 期间允许提交（取不到票会就地提示），`error` 时禁掉按钮。 */
 type TurnstileState = 'loading' | 'ready' | 'error';
 
-type FieldName = 'studentId' | 'name' | 'className' | 'qq' | 'mcId';
+type FieldName = 'studentId' | 'name' | 'college' | 'className' | 'qq' | 'mcId';
 
+/**
+ * 六个人工字段。`placeholder` 与 `hint` 用的都是**同一个同学的同一份资料**
+ * （学号 2026010101 / 青木阳菜 / 金融学院 / 金融2601 / 20261001 / Rana），
+ * 逐格对上号之后，同学一眼就知道每一格该填成什么样 —— 早先每格各写各的
+ * （「真实姓名」「5–12 位数字」「例如 Steve」），拼不出一份完整的样子。
+ */
 const FIELDS: ReadonlyArray<{
   name: FieldName;
   label: string;
@@ -124,24 +135,36 @@ const FIELDS: ReadonlyArray<{
   {
     name: 'studentId',
     label: '学号',
-    placeholder: '例如 20230012345',
-    hint: '4–20 位数字，同一个学号只能报名一次',
-    maxLength: 20,
+    placeholder: '例如 2026010101',
+    hint: '10 位数字，同一个学号只能报名一次',
+    maxLength: 10,
   },
-  {name: 'name', label: '姓名', placeholder: '真实姓名', hint: '用于活动核对', maxLength: 20},
+  {name: 'name', label: '姓名', placeholder: '例如 青木阳菜', hint: '用于活动核对', maxLength: 20},
+  {
+    name: 'college',
+    label: '学院',
+    placeholder: '例如 金融学院',
+    hint: '填写学院全称',
+    maxLength: 40,
+  },
   {
     name: 'className',
     label: '班级',
-    placeholder: '例如 计算机科学与技术 2301',
-    hint: '填到班级即可',
+    placeholder: '例如 金融2601',
+    hint: '只写班级，不用再带学院',
     maxLength: 40,
-    wide: true,
   },
-  {name: 'qq', label: 'QQ', placeholder: '5–12 位数字', hint: '后续通知用', maxLength: 12},
+  {
+    name: 'qq',
+    label: 'QQ',
+    placeholder: '例如 20261001',
+    hint: '5–12 位数字，后续通知用',
+    maxLength: 12,
+  },
   {
     name: 'mcId',
     label: 'Minecraft 游戏 ID',
-    placeholder: '例如 Steve',
+    placeholder: '例如 Rana',
     hint: 'Java 版 ID：字母、数字、下划线',
     maxLength: 32,
   },
@@ -151,6 +174,7 @@ type Status = 'idle' | 'sending' | 'done' | 'error';
 
 type Registered = {
   name: string;
+  college: string;
   className: string;
   mcId: string;
   hasSkin: boolean;
@@ -181,7 +205,7 @@ type Preview = {source: 'upload' | 'littleskin'; url: string; label: string};
  *
  * 三条边界都是有意的：
  *
- * 1. **只存文字（五项 + TID），不存皮肤文件。** `<input type="file">` 的 value 是只读的，
+ * 1. **只存文字（六项 + TID），不存皮肤文件。** `<input type="file">` 的 value 是只读的，
  *    浏览器不让脚本往里塞文件 —— 就算把字节存进 IndexedDB 再读回 state，输入框仍然写着
  *    「No file chosen」，界面在撒谎。文件还在同学自己硬盘上，重选一次是一下的事。
  * 2. **提交成功就立刻清掉**（见 `submit()`）。留着的话，下一位用这台机器的人（教室机器是
@@ -196,11 +220,11 @@ const DRAFT_TTL_DAYS = Math.round(DRAFT_TTL_MS / 86_400_000);
 type Draft = {values: Record<FieldName, string>; tid: string; savedAt: number};
 
 function emptyValues(): Record<FieldName, string> {
-  return {studentId: '', name: '', className: '', qq: '', mcId: ''};
+  return {studentId: '', name: '', college: '', className: '', qq: '', mcId: ''};
 }
 
 /**
- * 五项 + TID 里有没有值得存的东西。全空就当没有草稿 —— 否则下次进来会弹一句「已恢复上次
+ * 六项 + TID 里有没有值得存的东西。全空就当没有草稿 —— 否则下次进来会弹一句「已恢复上次
  * 填写的内容」，却什么都没恢复。
  */
 function draftHasContent(values: Record<FieldName, string>, tid: string): boolean {
@@ -650,7 +674,7 @@ export default function Signup(): ReactNode {
   return (
     <Layout
       title="活动报名"
-      description={`${activity.fullName}的在线报名入口：填写学号、姓名、班级、QQ 与 Minecraft 游戏 ID，可自愿上传一张 5 MB 以内的皮肤，或直接填 LittleSkin 皮肤 TID。`}>
+      description={`${activity.fullName}的在线报名入口：填写学号、姓名、学院、班级、QQ 与 Minecraft 游戏 ID，可自愿上传一张 5 MB 以内的皮肤，或直接填 LittleSkin 皮肤 TID。`}>
       <main className={styles.page} data-signup>
         <div className="container">
           <header className={styles.head}>
@@ -658,7 +682,7 @@ export default function Signup(): ReactNode {
               活动报名
             </Heading>
             <p className={styles.lead}>
-              填写下面五项即可完成报名，提交后会出现在
+              填写下面六项即可完成报名，提交后会出现在
               <Link to="/participants"> 小伙伴们 </Link>
               名单里。皮肤是可选的 —— 可以上传一张 PNG，也可以直接填 LittleSkin 的皮肤 TID
               让我们替你取；两样都不填的同学会穿上本站的默认皮肤。提交前有一道人机校验，
@@ -832,7 +856,8 @@ export default function Signup(): ReactNode {
                 清空重填
               </Button>
               <span className={styles.actionsNote}>
-                学号与 QQ 只用于活动核对，不会出现在公开名单里；游戏 ID、姓名与班级会公开展示。
+                学号、QQ 与真实姓名只用于活动核对，不会出现在公开名单里；名单上只展示
+                Minecraft 游戏 ID 与学院。
               </span>
             </div>
 
@@ -850,8 +875,8 @@ export default function Signup(): ReactNode {
               {status === 'error' ? message : null}
               {status === 'done' && registered ? (
                 <>
-                  报名成功：<strong>{registered.name}</strong>（{registered.className} ·{' '}
-                  {registered.mcId}）已加入名单
+                  报名成功：<strong>{registered.name}</strong>（{registered.college}{' '}
+                  {registered.className} · {registered.mcId}）已加入名单
                   {registered.hasSkin ? (
                     registered.skinSource === 'littleskin' ? (
                       <>
