@@ -195,6 +195,7 @@ club-party-website/
 | 页脚                    | 草方块包边 + 深板岩底纹，栏目标题配方块图标，链接用 GUI 按钮贴图（悬停切换高亮态）                                 |
 | 报名页 · `/signup`       | 学号（10 位）、姓名、学院、班级、QQ、Minecraft 游戏 ID 六项必填，皮肤可选，提交前要过人机校验；文件大小在前端先拦一道，真正说了算的是 Worker              |
 | 小伙伴 · `/participants` | 已报名的每人一张卡，游戏 ID 下面写学院；交过皮肤的用 skinview3d 转起来，没交的转默认皮肤，卡片上标注区别                              |
+| 全站 · 顶栏公告            | 导航栏上方一条通知条（Docusaurus 自带的 `announcementBar`），设成不可关闭（`isCloseable: false`）、始终可见；文案与 id 在 `docusaurus.config.ts`，配色按主题给在 `src/css/custom.css` |
 | 全站                    | 默认跟随系统深浅色，导航栏可手动切换 light / dark / auto                                        |
 
 灯箱通过 `createPortal` 挂到 `document.body`：卡片本身有 `overflow: hidden`，就地渲染会被裁掉。  

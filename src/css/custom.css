@@ -64,3 +64,32 @@ body {
   --ifm-color-primary-lightest: #4fddbf;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
+
+/*
+ * 顶部公告条（docusaurus.config.ts 的 themeConfig.announcementBar）。
+ *
+ * 为什么配色写在这里而不是配置里：配置的 `backgroundColor` / `textColor` 会以**内联样式**
+ * 落在元素上，两个主题共用一套颜色 —— 浅色下好看的在深色页面上就是一块突兀的亮片。
+ * 这里用 html[data-theme] 前缀按主题给两套色。
+ *
+ * `.theme-announcement-bar` 是 Docusaurus 的稳定类名（ThemeClassNames.announcementBar.container），
+ * 不是 CSS Modules 哈希，可以安全覆盖；主题自带的 `.announcementBar` 也是单类选择器，
+ * 而 `html[data-theme='x'] .theme-announcement-bar` 特异性更高，不靠加载顺序取胜。
+ *
+ * 对比度（WCAG 2.1 相对亮度比，AA 正文字号要求 4.5:1；浏览器实测量值）：
+ *   浅色 #ffffff on #277148 = 5.93:1；深色 #0b2b23 on #25c2a0 = 6.72:1。
+ *   两个底色都取自 Infima 现有的主色阶，不额外造色。
+ */
+html[data-theme='light'] .theme-announcement-bar {
+  background-color: var(--ifm-color-primary-darker);
+  color: #ffffff;
+}
+
+html[data-theme='dark'] .theme-announcement-bar {
+  background-color: var(--ifm-color-primary);
+  color: #0b2b23;
+}
+
+.theme-announcement-bar {
+  font-weight: 600;
+}
