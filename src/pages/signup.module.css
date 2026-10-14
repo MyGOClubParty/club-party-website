@@ -219,6 +219,27 @@
   color: var(--ifm-color-emphasis-700);
 }
 
+/* 「已恢复上次填写的内容」那条提示。
+ *
+ * 跟下面的结果条同一个教训：底色自己定、两种主题各一套不透明色，对比度只由这两行说了算，
+ * 不靠页面底色透出来 —— 半透明底 + 浅色字在浅色主题下曾经只有 1.03:1（见 .status 的注释）。
+ * 实测：浅色 10.00:1（#1f3a5f / #e8f0fb），深色 12.55:1（#dbe8f8 / #16243a）。 */
+.draftNotice {
+  max-width: 48rem;
+  margin: 0 auto 1rem;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.85rem;
+  color: #1f3a5f;
+  background: #e8f0fb;
+  border-left: 4px solid #4a7fc1;
+}
+
+[data-theme='dark'] .draftNotice {
+  color: #dbe8f8;
+  background: #16243a;
+  border-left-color: #6f9fd8;
+}
+
 /* 提交结果条。
  *
  * **底色必须自己定（不透明），不许靠页面的主题色透出来。** 这条不在深色面板里，而是直接

@@ -175,14 +175,95 @@ type TidPreview =
 /** 预览区当前展示的是哪一张皮肤 —— 两个来源共用一个位置，同一时刻只会有一个是活的。 */
 type Preview = {source: 'upload' | 'littleskin'; url: string; label: string};
 
+/**
+ * 没提交完的内容存在**本机浏览器**里（localStorage），刷新、误关标签页、上传失败回来
+ * 都不用重打一遍。
+ *
+ * 三条边界都是有意的：
+ *
+ * 1. **只存文字（五项 + TID），不存皮肤文件。** `<input type="file">` 的 value 是只读的，
+ *    浏览器不让脚本往里塞文件 —— 就算把字节存进 IndexedDB 再读回 state，输入框仍然写着
+ *    「No file chosen」，界面在撒谎。文件还在同学自己硬盘上，重选一次是一下的事。
+ * 2. **提交成功就立刻清掉**（见 `submit()`）。留着的话，下一位用这台机器的人（教室机器是
+ *    共用的）打开报名页会被填上已经报过名的那位同学的信息。
+ * 3. **有保质期。** 姓名 / 学号 / QQ 是个人信息，不该在共用电脑上无限期留着。
+ */
+const DRAFT_KEY = 'clubparty:signup-draft:v1';
+const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** 提示文案里要说「几天」，从上面那个常量算出来，免得改了一处忘了另一处。 */
+const DRAFT_TTL_DAYS = Math.round(DRAFT_TTL_MS / 86_400_000);
+
+type Draft = {values: Record<FieldName, string>; tid: string; savedAt: number};
+
+function emptyValues(): Record<FieldName, string> {
+  return {studentId: '', name: '', className: '', qq: '', mcId: ''};
+}
+
+/**
+ * 五项 + TID 里有没有值得存的东西。全空就当没有草稿 —— 否则下次进来会弹一句「已恢复上次
+ * 填写的内容」，却什么都没恢复。
+ */
+function draftHasContent(values: Record<FieldName, string>, tid: string): boolean {
+  return FIELDS.some((field) => values[field.name].trim() !== '') || tid.trim() !== '';
+}
+
+/**
+ * 读草稿。**库里的东西一样当成不可信输入**：只认认识的键、只认字符串、按各自的 `maxLength`
+ * 截一下。隐私模式禁了 storage、JSON 被改坏、键对不上 —— 一律当「没有草稿」。缓存只是体验，
+ * 它坏掉不能让整个报名页跟着坏。
+ */
+function readDraft(): Draft | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {values?: unknown; tid?: unknown; savedAt?: unknown} | null;
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    if (typeof parsed.savedAt !== 'number' || Date.now() - parsed.savedAt > DRAFT_TTL_MS) {
+      // 过期（或时间戳都不认识）就别继续留着这份个人信息了
+      window.localStorage.removeItem(DRAFT_KEY);
+      return null;
+    }
+    const source = (typeof parsed.values === 'object' && parsed.values !== null
+      ? parsed.values
+      : {}) as Record<string, unknown>;
+    const values = emptyValues();
+    for (const field of FIELDS) {
+      const value = source[field.name];
+      if (typeof value === 'string') values[field.name] = value.slice(0, field.maxLength);
+    }
+    const tid = typeof parsed.tid === 'string' ? parsed.tid.slice(0, 10) : '';
+    return draftHasContent(values, tid) ? {values, tid, savedAt: parsed.savedAt} : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(values: Record<FieldName, string>, tid: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (!draftHasContent(values, tid)) {
+      window.localStorage.removeItem(DRAFT_KEY);
+      return;
+    }
+    const draft: Draft = {values, tid, savedAt: Date.now()};
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // 隐私模式、配额满：静默跳过，报名本身不受影响
+  }
+}
+
+function clearDraft(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // 同上
+  }
+}
+
 export default function Signup(): ReactNode {
-  const [values, setValues] = useState<Record<FieldName, string>>({
-    studentId: '',
-    name: '',
-    className: '',
-    qq: '',
-    mcId: '',
-  });
+  const [values, setValues] = useState<Record<FieldName, string>>(emptyValues);
   const [skin, setSkin] = useState<File | null>(null);
   const [fileError, setFileError] = useState('');
   const [tid, setTid] = useState('');
@@ -192,6 +273,33 @@ export default function Signup(): ReactNode {
   const [registered, setRegistered] = useState<Registered | null>(null);
   /** 「二选一」要能把文件输入清空 —— 受控组件的 value 是只读的，只能走 DOM。 */
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  /** 恢复了草稿没有 —— 决定那句「已恢复上次填写的内容」要不要显示。 */
+  const [restoredDraft, setRestoredDraft] = useState(false);
+  /**
+   * 草稿读完了没有。**不能省这一条**：
+   * 恢复必须放在 effect 里（SSG 时没有 localStorage；就算有，拿它当 useState 初值也会让
+   * 首屏 HTML 与客户端首帧对不上，React 会报 hydration 不一致），而落盘那个 effect 在同一
+   * 次提交里**排在恢复之后**——不拦住它，它会拿着初始的空值把刚恢复出来的草稿重新抹掉。
+   */
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
+  // 恢复草稿。只跑一次。
+  useEffect(() => {
+    const draft = readDraft();
+    if (draft) {
+      setValues(draft.values);
+      setTid(draft.tid);
+      setRestoredDraft(true);
+    }
+    setDraftLoaded(true);
+  }, []);
+
+  // 之后每次改动落盘。等 `draftLoaded` 翻过来才写，理由见上面那段注释。
+  useEffect(() => {
+    if (!draftLoaded) return;
+    writeDraft(values, tid);
+  }, [draftLoaded, values, tid]);
 
   // ---- 人机校验（Turnstile）。widget 是命令式的，所以实例、容器都拿 ref 记着。
   const tsBox = useRef<HTMLDivElement | null>(null);
@@ -385,6 +493,8 @@ export default function Signup(): ReactNode {
 
   const setField = (name: FieldName) => (value: string) => {
     setValues((previous) => ({...previous, [name]: value}));
+    // 人一动笔，「已恢复上次的内容」就不用再挂着了
+    setRestoredDraft(false);
     if (status === 'error') {
       setStatus('idle');
       setMessage('');
@@ -393,6 +503,7 @@ export default function Signup(): ReactNode {
 
   const pickSkin = (event: ChangeEvent<HTMLInputElement>) => {
     const picked = event.target.files?.[0] ?? null;
+    setRestoredDraft(false);
     if (picked && picked.size > MAX_SKIN_BYTES) {
       // 前端这一下只是为了不让同学白等一次上传，后端还会再量一遍真实字节数
       setFileError(`皮肤不能超过 5 MB（这个文件 ${(picked.size / 1024 / 1024).toFixed(2)} MB）`);
@@ -408,6 +519,7 @@ export default function Signup(): ReactNode {
 
   const setTidValue = (value: string) => {
     setTid(value);
+    setRestoredDraft(false);
     // 反向的同一件事：开始填 TID 就取消已选的文件
     if (value.trim() && skin) {
       setSkin(null);
@@ -418,6 +530,39 @@ export default function Signup(): ReactNode {
       setStatus('idle');
       setMessage('');
     }
+  };
+
+  /** 表单回到刚打开的样子。「清空重填」与提交成功共用它。 */
+  const resetForm = () => {
+    setValues(emptyValues());
+    setTid('');
+    setSkin(null);
+    setFileError('');
+    setTidPreview({state: 'idle'});
+    setRestoredDraft(false);
+    // 文件输入是只读的，只能走 DOM 清
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  /** 表里有东西可清吗 —— 决定「清空重填」看着是不是可点。 */
+  const hasContent = draftHasContent(values, tid) || skin !== null;
+
+  /**
+   * 「清空重填」：表单和本机草稿一起抹掉。
+   *
+   * 不弹 `window.confirm` —— 那是原生弹窗，跟这套像素 GUI 摆一起格外突兀，需求也明说了
+   * 要「一键」。风险交给位置和样式承担：它排在提交按钮**右侧**、次级外观，不是顺手能误点的。
+   *
+   * 另外自己再判一次 `hasContent`：组件库的 `Button` 只把 `disabled` 变成样式类、**不会
+   * 落到 DOM 上**（Button.tsx 把它解构走了没往下传），所以光靠 `disabled` 拦不住点击。
+   */
+  const clearAll = () => {
+    if (!hasContent) return;
+    resetForm();
+    clearDraft();
+    setStatus('idle');
+    setMessage('');
+    setRegistered(null);
   };
 
   /** 提交前取票。票是**一次性**的：用过或过期都得重取，所以失败之后还要 reset。 */
@@ -481,6 +626,11 @@ export default function Signup(): ReactNode {
       if (response.ok && payload && payload.ok) {
         setStatus('done');
         setRegistered(payload.participant);
+        // 交上去了，草稿和表单一起清掉：留着的话，下一位用这台共用机器的人打开报名页会被
+        // 填上已经报过名的那位同学的信息；表单也一并清空，免得顺手再点一次提交，撞上
+        // 「同一个学号只能报名一次」。
+        resetForm();
+        clearDraft();
         return;
       }
       setStatus('error');
@@ -517,6 +667,16 @@ export default function Signup(): ReactNode {
           </header>
 
           <form onSubmit={submit} data-signup-form>
+            {/*
+              恢复过草稿才出现。顺带把「东西存在哪、什么时候失效」讲清楚 —— 这是个人信息，
+              同学有权知道它落在了这台机器上。
+            */}
+            {restoredDraft ? (
+              <p className={styles.draftNotice} data-signup-draft="restored">
+                已恢复上次没提交完的内容（就存在这台设备的浏览器里，{DRAFT_TTL_DAYS} 天后自动失效）。
+                要从头填就点下面的「清空重填」。
+              </p>
+            ) : null}
             <section className={styles.panel}>
               <Heading as="h2" className={styles.panelTitle}>
                 <img src="/mc/blocks/crafting_table_top.png" alt="" aria-hidden="true" />
@@ -658,6 +818,18 @@ export default function Signup(): ReactNode {
                 type="submit"
                 disabled={status === 'sending' || tsState === 'error'}>
                 {status === 'sending' ? '提交中…' : '提交报名'}
+              </Button>
+              {/*
+                「清空重填」。它在 form 里面，所以**必须显式写 type="button"** —— 默认类型是
+                submit，漏掉这一行就悄悄多出一个提交按钮。
+              */}
+              <Button
+                variant="secondary"
+                type="button"
+                onClick={clearAll}
+                disabled={!hasContent}
+                data-signup-clear>
+                清空重填
               </Button>
               <span className={styles.actionsNote}>
                 学号与 QQ 只用于活动核对，不会出现在公开名单里；游戏 ID、姓名与班级会公开展示。
