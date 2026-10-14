@@ -580,7 +580,7 @@ export default function Signup(): ReactNode {
                   className={styles.input}
                   name="littleskinTid"
                   value={tid}
-                  placeholder="例如 905719"
+                  placeholder="例如 855158"
                   onChange={setTidValue}
                   inputMode="numeric"
                   autoComplete="off"
@@ -592,7 +592,7 @@ export default function Signup(): ReactNode {
                   <a href="https://littleskin.cn/skinlib" target="_blank" rel="noreferrer noopener">
                     littleskin.cn
                   </a>{' '}
-                  的 <span className={styles.keyName}>/skinlib/show/905719</span>
+                  的 <span className={styles.keyName}>/skinlib/show/855158</span>
                   ）。两种方式二选一，切换时另一项会自动清空。
                 </span>
               </label>

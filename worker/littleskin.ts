@@ -39,8 +39,8 @@ export const TID_RE = /^\d{1,10}$/;
  * TID 的上界 = PostgreSQL 的 `integer` 上界。
  *
  * 上游 `/texture/<tid>` 是直接拿 TID 去查 `integer` 列的，**超出范围它自己会 500**：
- * 实测 `9057199999` 回
- * `SQLSTATE[22003]: Numeric value out of range ... value "9057199999" is out of range for type integer`。
+ * 实测 `8551589999` 回
+ * `SQLSTATE[22003]: Numeric value out of range ... value "8551589999" is out of range for type integer`。
  * 与其让同学看到一句莫名其妙的 500，不如在这里就判定「这个 TID 不可能存在」。
  * （10 位数可以超过 int32，所以形状检查之外还得卡这个数。）
  */
@@ -105,7 +105,7 @@ export async function lookupSkinTid(rawTid: string): Promise<TidLookup> {
       ok: false,
       status: 400,
       code: 'tid_invalid',
-      message: 'LittleSkin TID 只能是数字（皮肤详情页地址末尾那串，例如 905719）',
+      message: 'LittleSkin TID 只能是数字（皮肤详情页地址末尾那串，例如 855158）',
     };
   }
   if (Number(tid) > MAX_TID) {
