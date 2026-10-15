@@ -19,8 +19,13 @@
  *
  * 落库 / 落桶的顺序是刻意的：先写 D1（学号唯一，重复报名在这一步被挡住），
  * 再 put R2；R2 失败就把刚才那行删掉 —— 宁可没有记录，也不要留一条指向不存在对象的行。
+ *
+ * **表不用手动建**：库是新的（表还不存在）时，第一次落库会撞 `no such table`，这里就地建表
+ * 再重试一遍 —— 见 worker/db.ts。所以换一个 database_id、或者把库清空之后，第一个报名请求
+ * 会把表结构一并带出来，不需要任何额外动作。
  */
 
+import {ensureSchema, isMissingTable} from './db';
 import {fail, json, methodNotAllowed} from './http';
 import {skinBytesFromTid} from './littleskin';
 import {verifyTurnstile} from './turnstile';
@@ -167,7 +172,12 @@ export async function handleRegister(request: Request, env: Env): Promise<Respon
 
   const key = skinBytes ? skinKey(mcId, studentId) : null;
 
-  try {
+  /**
+   * 「查重 → 落库」整段。写成函数是为了**能整段重来**：库是新建的、表还没建时，连第一个
+   * SELECT 都会撞 `no such table`，建完表必须从头再走一遍。
+   * 返回非 null = 这次报名被正常拒掉（重复学号 / 皮肤名撞车）；返回 null = 写进去了。
+   */
+  const writeRow = async (): Promise<Response | null> => {
     const duplicated = await env.DB.prepare('SELECT id FROM participants WHERE student_id = ?')
       .bind(studentId)
       .first();
@@ -195,13 +205,46 @@ export async function handleRegister(request: Request, env: Env): Promise<Respon
       // 但名单是公开接口、不能为了一个标签去逐个问 R2 —— 见 worker/migrate-add-skin-source.sql）。
       .bind(studentId, name, college, className, qq, mcId, key, skinFrom ?? '', skinTid)
       .run();
-  } catch (error) {
+    return null;
+  };
+
+  /** 落库失败怎么答：`UNIQUE` 是并发下两个请求同时进来的兜底，其余一律 503。 */
+  const storeFailure = (error: unknown): Response => {
     const message = error instanceof Error ? error.message : String(error);
-    // UNIQUE 约束是并发下的兜底：上面那次 SELECT 挡不住两个请求同时进来
     if (message.includes('UNIQUE')) {
       return fail(409, 'student_id_taken', '这个学号已经报名过了，不用重复提交');
     }
+    // 对外只给一句话，原因进 Worker 日志（`wrangler dev` / `wrangler tail`）——
+    // 不加这句的话这一支在日志里只留一行 503，查起来得靠猜。
+    console.error('register: 落库失败', message);
     return fail(503, 'store_failed', '报名数据保存失败，请稍后重试');
+  };
+
+  try {
+    const rejected = await writeRow();
+    if (rejected) return rejected;
+  } catch (error) {
+    // 只认 `no such table`：全新的库（换了 database_id、库被清空、从没建过表）走这条路。
+    // 其它错误照旧交给 storeFailure，不拿建表去掩盖真实的故障。
+    if (!isMissingTable(error)) return storeFailure(error);
+    try {
+      // 表结构随 Worker 发布（见 worker/db.ts）：第一个报名进来时自己把表建起来。
+      await ensureSchema(env);
+    } catch (error) {
+      // 建表本身失败（schema.sql 有问题、库不可写……）：原因进日志，对外还是那句话
+      console.error(
+        'register: 建表失败',
+        error instanceof Error ? (error.stack ?? error.message) : error,
+      );
+      return fail(503, 'store_failed', '报名数据保存失败，请稍后重试');
+    }
+    try {
+      const rejected = await writeRow();
+      if (rejected) return rejected;
+    } catch (retryError) {
+      // 建表已经试过一遍，这次还失败就没什么可补救的了 —— 如实往上报
+      return storeFailure(retryError);
+    }
   }
 
   if (key && skinBytes) {

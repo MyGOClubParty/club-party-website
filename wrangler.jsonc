@@ -35,12 +35,16 @@
     "not_found_handling": "404-page",
     "run_worker_first": ["/api/*"]
   },
-  // 报名数据。建表：`npm run db:migrate:local`（本地模拟）/ `db:migrate:remote`（线上，需凭据）。
+  // 报名数据。**建表不用手动跑**：第一个报名请求进来时 Worker 自己把表建起来
+  // （`CREATE TABLE IF NOT EXISTS` 幂等，见 worker/db.ts 的 ensureSchema）。
+  // `db:migrate:*` 仍然留着，但只用在两件事上：手动重建一个空库、以及给**老库补列**
+  // （migrate-add-college.sql / migrate-add-skin-source.sql —— SQLite 的 ADD COLUMN 补不了
+  // 已经存在但没有该列的表，那两件事只能手动做一次）。
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "club-party-db",
-      "database_id": "98c0496a-4c35-41d0-b1c5-cfa57e4db351"
+      "database_id": "254dd607-b77f-41ab-a349-1dad25242ac6"
     }
   ],
   // 皮肤文件。对象键 = Minecraft 游戏 id + 学号后两位 + ".png"（见 worker/skin.ts）。

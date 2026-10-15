@@ -27,3 +27,15 @@ interface Env {
    */
   TURNSTILE_SECRET?: string;
 }
+
+/**
+ * `worker/schema.sql` 是以**文本**模块导入的（`import schemaSql from './schema.sql'`，
+ * 见 worker/db.ts）。TypeScript 不认 `.sql` 后缀，所以在这儿给它一个字符串类型。
+ * 真正把文件内容变成模块的是 **wrangler 内置的默认规则**（`type: "Text"`，globs 含
+ * `**/*.sql`）—— 不用在 wrangler.jsonc 里自己再声明一条：自己声明会把默认那条挤掉
+ * （默认还管着 .txt / .html），wrangler 会为此发一条 fallthrough 警告。
+ */
+declare module '*.sql' {
+  const content: string;
+  export default content;
+}

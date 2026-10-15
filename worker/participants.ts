@@ -12,6 +12,7 @@
  * 库里存着给活动核对就够（要查某张皮肤出自哪个 TID，报名回执与 R2 的 customMetadata 里都有）。
  */
 
+import {isMissingTable} from './db';
 import {fail, json, methodNotAllowed} from './http';
 import {SKIN_KEY_RE} from './skin';
 
@@ -33,11 +34,16 @@ export async function listParticipants(request: Request, env: Env): Promise<Resp
       'SELECT college, mc_id, skin_key, skin_source, littleskin_tid, created_at FROM participants ORDER BY created_at DESC, id DESC',
     ).all<Row>();
     rows = result.results ?? [];
-  } catch {
-    // 三种都要说：还没建表（`db:migrate:remote` 没跑）、表在但 `college` 没补
-    // （`db:migrate:college:remote` 没跑）、或者 `skin_source` 没补
-    // （`db:migrate:source:remote` 没跑）—— 后两种都会在这里报 `no such column`。
-    return fail(503, 'db_unavailable', '报名数据暂时读不到，可能是数据库还没初始化或没升级');
+  } catch (error) {
+    // 表还不存在 = 这个库刚建出来、第一个报名还没来（建表由报名那一刻触发，见 worker/db.ts）。
+    // 那不是故障，是「还没有人报名」—— 照常回一份空名单，页面显示 0 人。
+    // （读接口刻意**不**顺手建表：GET 触发 DDL 很别扭，而且真正该建表的是报名那条路。）
+    if (isMissingTable(error)) {
+      return json({ok: true, count: 0, participants: []});
+    }
+    // 表在但列不齐（老库没跑 `db:migrate:college:remote` / `db:migrate:source:remote`）会报
+    // `no such column` —— 那种是真的没升级完，如实 503。
+    return fail(503, 'db_unavailable', '报名数据暂时读不到，可能是数据库还没升级完');
   }
 
   return json({
