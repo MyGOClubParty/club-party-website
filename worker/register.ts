@@ -14,6 +14,8 @@
  *
  * 两个都给 → 400，不猜他要哪个（猜错等于把人家挑好的那张悄悄丢了）。
  * 拿到字节之后两条路**完全合并**：同一道 `inspectSkin` 闸门、同一条 R2 命名规则。
+ * 但**来源要分开记**：`skin_source` 落 `'upload'` / `'littleskin'`，TID 另存 `littleskin_tid`
+ * —— 名单页靠它把标签分成「手动上传 / LittleSkin」（见 worker/migrate-add-skin-source.sql）。
  *
  * 落库 / 落桶的顺序是刻意的：先写 D1（学号唯一，重复报名在这一步被挡住），
  * 再 put R2；R2 失败就把刚才那行删掉 —— 宁可没有记录，也不要留一条指向不存在对象的行。
@@ -186,9 +188,12 @@ export async function handleRegister(request: Request, env: Env): Promise<Respon
     }
 
     await env.DB.prepare(
-      'INSERT INTO participants (student_id, name, college, class_name, qq, mc_id, skin_key) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO participants (student_id, name, college, class_name, qq, mc_id, skin_key, skin_source, littleskin_tid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     )
-      .bind(studentId, name, college, className, qq, mcId, key)
+      // 来源与 TID 跟皮肤一起入库：名单卡片下面那个标签要按它分「手动上传 / LittleSkin」，
+      // 而且日后对账能查出这张皮肤是从哪个 TID 取的（R2 对象的 customMetadata 里也留了一份，
+      // 但名单是公开接口、不能为了一个标签去逐个问 R2 —— 见 worker/migrate-add-skin-source.sql）。
+      .bind(studentId, name, college, className, qq, mcId, key, skinFrom ?? '', skinTid)
       .run();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

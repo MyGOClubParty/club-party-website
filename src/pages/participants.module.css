@@ -60,6 +60,53 @@
     inset 3px 0 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
 }
 
+/* 3D 区那一下点击：整块做成按钮，点开弹窗（键盘也够得着）。
+   外观必须是透明的 —— 画面归 SkinViewer，这里只负责接住点击。 */
+.peek {
+  display: block;
+  position: relative;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: zoom-in;
+  font: inherit;
+}
+
+.peek:focus-visible {
+  outline: 2px solid var(--primary-color-hover, #50ad2e);
+  outline-offset: 3px;
+}
+
+/* 提示只在悬停/聚焦时冒出来，免得一屏 20 张卡片都在喊「点我」。 */
+.peekHint {
+  position: absolute;
+  left: 50%;
+  bottom: 0.45rem;
+  transform: translateX(-50%);
+  padding: 0.12rem 0.5rem;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.peek:hover .peekHint,
+.peek:focus-visible .peekHint {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .peekHint {
+    transition: none;
+  }
+}
+
 .meta {
   padding: 0 0.15rem;
 }

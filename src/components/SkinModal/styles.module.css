@@ -1,0 +1,182 @@
+/* 「小伙伴们」的弹窗查看器：外观沿用卡片那套 Minecraft GUI 语言
+   （深色面板 + 四边斜角），和卡片一样固定深色、不随站点主题翻转，
+   所以面板里要自己声明 color。 */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  /* 盖过顶栏（Docusaurus 的 200）与公告条；页面里没有比它更靠上的东西 */
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 1.1rem;
+  background: rgba(6, 6, 10, 0.66);
+  backdrop-filter: blur(3px);
+}
+
+/* 关着时用 CSS 藏，不用条件渲染 —— 画布节点必须一直在 DOM 里，
+   否则 WebGL 上下文会跟着一起被回收（见 index.tsx 文件头）。 */
+.overlay[data-skin-modal='closed'] {
+  display: none;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: min(560px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 0.75rem 0.75rem 0.9rem;
+  background: var(--background-color, #23232a);
+  color: var(--text-color, #fff);
+  box-shadow:
+    inset 0 -3px 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset -3px 0 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 0 3px 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4)),
+    inset 3px 0 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.who {
+  flex: 1;
+  min-width: 0;
+}
+
+.mcId {
+  margin: 0;
+  font-family: Minecraft, Minercraftory, var(--ifm-font-family-base);
+  font-size: 1.05rem;
+  overflow-wrap: anywhere;
+}
+
+.college {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--secondary-color, #d0d1d4);
+  overflow-wrap: anywhere;
+}
+
+/* 3D 舞台：底纹与卡片里的 3D 区完全一致（石头 + 按主题的罩子 + 斜角），
+   一眼能认出「这就是刚才那格，放大了」。高度跟着视口收，矮屏上不至于把控制区顶出屏幕。 */
+.stage {
+  --skin-veil: rgba(250, 251, 252, 0.9);
+  position: relative;
+  width: 100%;
+  height: min(58vh, 460px);
+  overflow: hidden;
+  background-color: var(--background-color, #23232a);
+  background-image: linear-gradient(var(--skin-veil), var(--skin-veil)), url('/mc/blocks/stone.png');
+  background-size: auto, 96px 96px;
+  box-shadow:
+    inset 0 -3px 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset -3px 0 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 0 3px 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4)),
+    inset 3px 0 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
+}
+
+[data-theme='dark'] .stage {
+  --skin-veil: rgba(17, 21, 26, 0.88);
+}
+
+/* three 会给画布写死 px 的 style.width/height，所以这里用绝对定位：
+   撑开盒子的是 .stage，画布只是贴上去，不会反过来把盒子越撑越大。 */
+.canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  cursor: grab;
+  /* 触屏：不让浏览器把单指拖拽解释成滚动，交给 OrbitControls */
+  touch-action: none;
+}
+
+.canvas:active {
+  cursor: grabbing;
+}
+
+.hint {
+  position: absolute;
+  right: 0.5rem;
+  bottom: 0.45rem;
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--secondary-color, #d0d1d4);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.failed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--error-color, #ff8383);
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+/* 标签列固定宽度，右边一列放控件 —— 三行控件因此左边缘对齐
+   （第三行本来没有标签，用个空的占位格，别让它比上面两行多缩进一截）。 */
+.row {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.82rem;
+  color: var(--secondary-color, #d0d1d4);
+}
+
+/* 8 个动作排成 4×2 —— 让它自己折行的话会变成「7 个一行 + 游泳孤零零挂第二行」。 */
+.animations {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.speeds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.toggleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+@media (max-width: 480px) {
+  .overlay {
+    padding: 0.6rem;
+  }
+
+  .stage {
+    height: min(50vh, 360px);
+  }
+}

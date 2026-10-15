@@ -25,7 +25,9 @@
     "db:migrate:remote": "wrangler d1 execute club-party-db --remote --file=worker/schema.sql",
     "db:migrate:college:local": "wrangler d1 execute club-party-db --local --file=worker/migrate-add-college.sql",
     "db:migrate:college:remote": "wrangler d1 execute club-party-db --remote --file=worker/migrate-add-college.sql",
-    "db:query:local": "wrangler d1 execute club-party-db --local --command=\"SELECT id, student_id, name, college, class_name, mc_id, skin_key, created_at FROM participants ORDER BY created_at DESC\"",
+    "db:migrate:source:local": "wrangler d1 execute club-party-db --local --file=worker/migrate-add-skin-source.sql",
+    "db:migrate:source:remote": "wrangler d1 execute club-party-db --remote --file=worker/migrate-add-skin-source.sql",
+    "db:query:local": "wrangler d1 execute club-party-db --local --command=\"SELECT id, student_id, name, college, class_name, mc_id, skin_key, skin_source, littleskin_tid, created_at FROM participants ORDER BY created_at DESC\"",
     "db:seed:local": "wrangler d1 execute club-party-db --local --file=worker/seed-test-roster.sql",
     "gate:quick": "npm run typecheck && npm run build",
     "gate:full": "npm run typecheck && npm run build && npm run cf:dry-run && node verify/api-check.cjs && node verify/turnstile-check.cjs"

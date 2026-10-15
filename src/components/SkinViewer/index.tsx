@@ -1,6 +1,7 @@
 import {useEffect, useRef, useState, type ReactNode} from 'react';
 import clsx from 'clsx';
 
+import {applyDefaultPose} from '../skinPose';
 import styles from './styles.module.css';
 
 /**
@@ -38,12 +39,22 @@ import styles from './styles.module.css';
  * 但 `render()` **只画不推进**（库源码里就是这么写的：「This method does not change the
  * animation progress」）—— 推进动画的 `animation.update(player, dt)` 在 `draw()` 里，
  * 而 `draw()` 正是被 `renderPaused` 关掉的那条循环。所以光把 `animation` 设上、
- * 然后一帧帧 `render()`，人物会**一动不动地转**：转的是我们自己推的
- * `playerWrapper.rotation.y`，四肢始终是初始站姿。要真的走起来，得自己喂时间。
+ * 然后一帧帧 `render()`，人物会**一动不动**（四肢始终是初始站姿）。要真的走起来，得自己喂时间：
+ * 每帧 `animation.update(playerObject, dt)` 再 `render()`。
  *
- * 于是每帧：`animation.update(playerObject, dt)` → `rotation.y += dt * speed` → `render()`。
  * 走路用库自带的 `WalkingAnimation`（摆四肢 + 头部微晃 + 披风摆），和 littleskin 是同一个
- * 动画类；`prefers-reduced-motion: reduce` 时两者都不推进，只出静态站姿。
+ * 动画类；`prefers-reduced-motion: reduce` 时不推进，只出静态站姿。
+ *
+ * ## 网格不自转、但也不再是正面（2026-10-15 起）
+ *
+ * 原先这里每帧推 `playerWrapper.rotation.y` 让一屏卡片一起自转。**已去掉**：一屏十几张一起转
+ * 既晃眼，也让「想看清某个人的皮肤」变得做不到（得等它转到正面）。现在网格只播走路、不转人物，
+ * 想要真的转着看就点开弹窗（`SkinModal`）——那边是真正的 OrbitControls，鼠标拖拽旋转 + 滚轮缩放，
+ * 而且带自转开关与动作选择。
+ *
+ * 「不转」的是**人物**，相机是摆好的：`ensureStage()` 里建完视图就调 `applyDefaultPose()`，
+ * 把它摆到标定台量出的那个**斜前方**（方位角约 -35°）。卡片、弹窗看到的是**同一处取景**
+ * （同一份常量在 `components/skinPose.ts`），所以点开卡片不会跳角度。
  *
  * ## 分辨率跟着显示密度走
  *
@@ -75,9 +86,20 @@ type StageViewer = {
   animation: {update(player: unknown, deltaTime: number): void} | null;
   /** 只有喂给 `animation.update()`，所以不必把 three 的 `PlayerObject` 拖进来 */
   readonly playerObject: unknown;
+  /** 摆默认取景要动的四个成员（`applyDefaultPose` 的入参形状，见 `components/skinPose.ts`）：
+   *  `playerWrapper` 只用来把自转角归零（每帧一并挂到 `data-skin-yaw` 上，好让「网格不自转」
+   *  可断言），`controls.update()` 负责按相机位置把朝向（`lookAt`）算出来 ——
+   *  这台视图 `enableControls: false`，鼠标控制全关，但 `update()` 不受 `enabled` 影响：
+   *  `enabled` 只挡事件处理器，所以它照样能把相机摆正。 */
+  readonly playerWrapper: {rotation: {y: number}};
+  readonly camera: {position: {x: number; y: number; z: number}};
+  readonly controls: {update: (deltaTime?: number) => void};
+  /** 竖直视场角。**改它会动距离**（库的 setter 里调 `adjustCameraDistance()`），摆位时必须先写。 */
+  fov: number;
+  /** 同上：也靠 `adjustCameraDistance()` 生效。 */
+  zoom: number;
   /** 改它会同时改绘制缓冲与合成器尺寸（库的 setter 里做全了） */
   pixelRatio: number | 'match-device';
-  readonly playerWrapper: {rotation: {y: number}};
   dispose: () => void;
 };
 
@@ -124,9 +146,7 @@ const MIN_RENDER_RATIO = 1;
 const MAX_RENDER_RATIO = 3;
 /** 舞台的额外下限：dpr=1 的屏也按 2 倍渲染再缩下来，缩采样比 1:1 出图边缘干净。 */
 const STAGE_MIN_RATIO = 2;
-/** 自转速度（rad/s）。比库默认的 1.0 慢一点 —— 一屏十几张一起转会晃眼。 */
-const ROTATE_SPEED = 0.8;
-/** 帧间隔：24fps。这么慢的自转用 60fps 纯属浪费，而一屏可能有十几张卡片要 blit。 */
+/** 帧间隔：24fps。一屏可能有十几张卡片要 blit，走路这个幅度用 60fps 纯属浪费。 */
 const FRAME_INTERVAL = 1000 / 24;
 
 const cards = new Set<Card>();
@@ -138,7 +158,6 @@ let stageFailed = false;
 let frameHandle = 0;
 let lastPaint = 0;
 let dirty = true;
-let angle = 0;
 let globalsBound = false;
 let reducedMotionQuery: MediaQueryList | null = null;
 let webglSupport: boolean | null = null;
@@ -186,7 +205,7 @@ function stageRatio(): number {
  * 人物左腿的摆动角度（弧度）——`WalkingAnimation` 每帧写的就是它。
  *
  * 只为了让「有没有真的在走」变成可断言的事实：光看画布像素有没有变，只能证明「有东西在动」，
- * 而自转本身就够让像素变了。腿角在 -0.5 ~ 0.5 之间来回摆才是走路。读不到就返回 0
+ * 证明不了动的是腿。腿角在 -0.5 ~ 0.5 之间来回摆才是走路。读不到就返回 0
  * （库改了内部结构也不至于抛错，只是那条断言会红 —— 正是想要的信号）。
  */
 function legSwing(viewer: StageViewer): number {
@@ -310,7 +329,7 @@ function tick(now: number): void {
   if (typeof document === 'undefined' || document.hidden || !hasVisible() || !stage) return;
 
   if (prefersReducedMotion()) {
-    // 不开自转时画面本来就是静的，只在「真有变化」时重画一次，不用一直跑
+    // 静态站姿下画面本来就是静的，只在「真有变化」时重画一次，不用一直跑
     if (dirty) paint(now);
     return;
   }
@@ -360,13 +379,19 @@ function paint(now: number): void {
   lastPaint = now;
 
   if (!prefersReducedMotion()) {
-    // 走路：库的 `render()` 不推进动画（见文件头），时间得自己喂
+    // 走路：库的 `render()` 不推进动画（见文件头），时间得自己喂。
+    // 不推自转 —— `playerWrapper.rotation.y` 一直是 0；斜前方的取景是**相机**摆出来的
+    // （见 `ensureStage()` 里那次 `applyDefaultPose()`），想自己转着看走弹窗。
+    // 顺带：库的 `cameraLight` 挂在相机上 → 相机摆过去，明暗也跟着和弹窗一致。
     current.viewer.animation?.update(current.viewer.playerObject, dt);
-    angle += dt * ROTATE_SPEED;
-    current.viewer.playerWrapper.rotation.y = angle;
   }
-  // 把当前腿角挂到画布上，好让「到底有没有在走」成为可断言的事实（见 legSwing 注释）
+  // 把当前腿角、自转角与相机取景挂到画布上，好让「到底有没有在走」「有没有偷偷自转」
+  // 「卡片是不是弹窗那一处取景」都变成可断言的事实（对照 `components/skinPose.ts` 的常量）
   current.viewer.canvas.dataset.skinPose = legSwing(current.viewer).toFixed(3);
+  current.viewer.canvas.dataset.skinYaw = current.viewer.playerWrapper.rotation.y.toFixed(3);
+  current.viewer.canvas.dataset.skinFov = current.viewer.fov.toFixed(1);
+  const {x, y, z} = current.viewer.camera.position;
+  current.viewer.canvas.dataset.skinCam = `${x.toFixed(2)},${y.toFixed(2)},${z.toFixed(2)}`;
 
   // 同一张皮肤只渲染一次，再一次 drawImage 给这一组里每张卡片
   const groups = new Map<string, Card[]>();
@@ -414,19 +439,22 @@ function ensureStage(): Promise<Stage | null> {
         width: 240,
         height: 320,
         pixelRatio: stageRatio(),
-        // 渲染节奏由 tick 排：库自带的那条 RAF 循环关掉，动画与自转都自己推（见文件头）
+        // 渲染节奏由 tick 排：库自带的那条 RAF 循环关掉，动画推进也自己喂（见文件头）。
         renderPaused: true,
-        // 自转不用库的 autoRotate：它只在库自己那条循环里生效，而那条循环正好被上面关了
-        // （库的默认值也是 false，它甚至不是构造参数，只能建完再赋值）。
-        // 库默认 true 会拿滚轮做缩放，列表页里等于把页面滚动吃掉
+        // 关了它，库的 `autoRotate` 与 OrbitControls 也一起失效 —— 网格本来就要这两样都不生效
         enableControls: false,
         // 卡片要反复把这块画布 drawImage 走，显式保留绘制缓冲最稳
         preserveDrawingBuffer: true,
         model: 'auto-detect',
       });
       // 走路：和 littleskin 用的是同一个动画类（摆四肢 + 头部微晃 + 披风）。设上它只是
-      // 让 pose 归位，真正推进靠每帧那次 `animation.update()` —— 少了那一步就只有自转没有走。
+      // 让 pose 归位，真正推进靠每帧那次 `animation.update()` —— 少了那一步人物是钉住的。
       viewer.animation = new skinview3d.WalkingAnimation();
+      // 取景：卡片和弹窗共用 `components/skinPose.ts` 那一份标定读数（斜前方约 -35°），
+      // 点开卡片时才不会跳角度。这台视图的鼠标控制是关着的，相机的朝向就靠 `applyDefaultPose()`
+      // 末尾那次 `controls.update()` 定下来 —— 摆位顺序（fov/zoom 先、`camera.position` 最后）
+      // 也在那边的注释里，别挪。
+      applyDefaultPose(viewer);
       stage = {viewer, skin: null, cssWidth: 0, cssHeight: 0, ratio: stageRatio()};
       return stage;
     } catch {
