@@ -1,9 +1,9 @@
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import {Button, Switch, Tag} from '@iicemeta/minecraft-react-ui';
 
+import {SKIN_PANORAMA, solidBackdrop, type SkinBackdrop} from '../skinBackdrop';
 import {applyDefaultPose} from '../skinPose';
 import {skinBadge, type SkinSource} from '../skinSource';
-import {skinToneOf, type SkinTone} from '../skinTone';
 import styles from './styles.module.css';
 
 /**
@@ -36,12 +36,15 @@ import styles from './styles.module.css';
  * **「重置视角」回的就是这一处** —— 库的 `resetCameraPose()` 摆的是**库默认**的正面
  * （fov 50 / 距离 43.82），早就不是这里的默认了，所以改成调自己的 `applyDefaultPose()`。
  *
- * ## 衬底跟着皮肤走，不跟主题走
+ * ## 背景：默认实景，可以切回素底
  *
- * `.stage` 上挂着 `data-skin-tone`：浅色皮肤压深底、深色皮肤压浅底（口径与判据在
- * `components/skinTone.ts`）。这件事必须由弹窗一起做 —— 它是「把那格放大」，
- * 卡片换了底而弹窗没换，点开就闪一下另一种底。属性挂在 `.stage` 上而不是画布上：
- * 画布是 three 的地盘（它会给画布写死 px 尺寸与像素比），底纹归 CSS。
+ * 打开时人物站在 **Minecraft 实景**里 —— 与卡片上看到的是同一个背景（同一张 equirectangular
+ * 全景、同一个 `scene.background`，见 `components/skinBackdrop.ts`），所以点开不跳画面。
+ * 控制区里可以切到**素底**：想看清皮肤纹理（半透明外层、像素画）时，一块安静的纯色比实景好用。
+ * 两种背景都落在画布的 `data-skin-modal-backdrop` 上，验收读它。
+ *
+ * 实景是「拉起来就贴」，不阻塞打开：`loadPanorama()` 是异步的，贴上来之前先压一块跟主题走的
+ * 素底（`--skin-solid`），别让人对着黑屏等。取不回来也一直是素底 —— 一张背景图不该把弹窗弄坏。
  *
  * ## 那些 `data-skin-modal-*` 属性
  *
@@ -113,6 +116,15 @@ const SPEED_PRESETS = [0.5, 1, 1.5, 2] as const;
 /** 默认速度：原速。 */
 const DEFAULT_SPEED = 1;
 
+/** 默认背景：实景（与卡片上看到的是同一张全景，点开才不跳）。 */
+const DEFAULT_BACKDROP: SkinBackdrop = 'panorama';
+
+/** 背景清单：实景 / 素底。控制区里那两个按钮照它渲染。 */
+const BACKDROPS: ReadonlyArray<{value: SkinBackdrop; label: string}> = [
+  {value: 'panorama', label: '实景'},
+  {value: 'solid', label: '素底'},
+];
+
 /**
  * 弹窗画布的像素密度：**不低于 2 倍**，不高于 3 倍。
  *
@@ -157,6 +169,11 @@ type PeekViewer = {
   zoom: number;
   /** 改它会同时重设绘制缓冲与合成器尺寸（库的 setter 里做全了） */
   pixelRatio: number | 'match-device';
+  /** 场景背景。全景贴上去之后是库建的 Texture，素底是一块 Color —— 写进来的只有 `string`
+   *  （库的 setter 收 `ColorRepresentation`），理由同 `SkinViewer` 那边。 */
+  background: unknown;
+  /** 贴 equirectangular 全景。**传 URL 时是异步的**（库里先 `loadImage` 再建 Texture）。 */
+  loadPanorama: (source: string) => Promise<void>;
   loadSkin: (source: HTMLImageElement | string) => void | Promise<void>;
   setSize: (width: number, height: number) => void;
 };
@@ -198,6 +215,14 @@ let peekPromise: Promise<PeekViewer | null> | null = null;
 let peekCanvas: HTMLCanvasElement | null = null;
 /** 上一次设进视图的像素密度 —— 显示密度没变就不用再动合成器尺寸 */
 let peekRatio = 0;
+/**
+ * 视图上**此刻**贴着的是哪种背景。
+ *
+ * 视图是常驻的（见文件头），所以这个事实也要跟着常驻：`background` 的 setter 会把上一张全景
+ * Texture `dispose()` 掉，因此「已经贴着了」不能靠 `viewer.background` 反查 —— 记在这里最省事，
+ * 也免得每次开关弹窗都重新解码那张 4K 图（画面会从素底闪一下才回实景）。
+ */
+let peekBackdrop: SkinBackdrop | null = null;
 
 async function ensurePeekViewer(canvas: HTMLCanvasElement | null): Promise<PeekViewer | null> {
   if (peekViewer) return peekViewer;
@@ -275,13 +300,11 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
   const [autoRotate, setAutoRotate] = useState(false);
   const [failed, setFailed] = useState(false);
   /**
-   * 衬底跟着**皮肤**的明暗走（口径与判据见 `components/skinTone.ts`）——
-   * 卡片和弹窗必须是同一块底，不然点开会闪一下另一种。
-   *
-   * 量好的结果按地址全站缓存，网格那边通常早就量过了，这里同步就能拿到；
-   * 真没量过（这个地址没进过任何一张卡片）就取一次图，量完再改底。
+   * 背景：默认实景（与卡片同款），可以切回素底细看皮肤。见文件头。
+   * **每次打开都重置** —— 同下面那个 effect 里的动作与速度，这个弹窗是「看一眼某人的皮肤」，
+   * 每次进来都该是同一个起点。
    */
-  const [tone, setTone] = useState<SkinTone>('mid');
+  const [backdrop, setBackdrop] = useState<SkinBackdrop>(DEFAULT_BACKDROP);
 
   const close = useCallback(() => onClose(), [onClose]);
 
@@ -329,6 +352,7 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
     setSpeed(DEFAULT_SPEED);
     setPaused(false);
     setAutoRotate(false);
+    setBackdrop(DEFAULT_BACKDROP);
 
     const applySize = (viewer: PeekViewer) => {
       if (!host) return;
@@ -378,21 +402,37 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
     };
   }, [open, skinUrl]);
 
-  /** 衬底：换人时跟着换（同 `[open, skinUrl]` 那个 effect，各管各的）。 */
+  /**
+   * 背景。与换人那个 effect 无关 —— 背景不跟着皮肤走（见文件头）。
+   *
+   * 依赖里没有 `skinUrl`：换人不该重贴一次背景。`backdrop === peekBackdrop` 那个提前返回
+   * 是为了「上次停在实景、这次打开还是实景」时**不重新解码那张 4K 图**（否则画面会从素底
+   * 闪一下才回实景）。反过来，上次停在素底、这次打开回到实景，就得真的重贴 ——
+   * `background` 的 setter 早把上一张全景 Texture `dispose()` 了。
+   */
   useEffect(() => {
-    if (!open || !skinUrl) return;
-    // 拿得到就同步用；拿不到先落回 `mid`（跟主题走），别留着**上一个人**的底。
-    // `live` 是必须的：这张图量完的回调是异步的，中间可能已经换过人了 ——
-    // 让晚到的结果去改新那个人的底，就会停在前一个人的颜色上。
-    let live = true;
-    const known = skinToneOf(skinUrl, (measured) => {
-      if (live) setTone(measured);
+    if (!open) return;
+    if (backdrop === peekBackdrop) return;
+    let cancelled = false;
+    void ensurePeekViewer(canvasRef.current).then((viewer) => {
+      if (cancelled || !viewer) return;
+      // 素底先垫上（两种背景都要）：全景是异步来的，别让人对着黑屏等一张 4K 图
+      const solid = solidBackdrop();
+      if (solid) viewer.background = solid;
+      if (backdrop === 'panorama') {
+        peekBackdrop = 'panorama';
+        void viewer.loadPanorama(SKIN_PANORAMA).catch(() => {
+          // 取不回来（404 / 断网 / 解码失败）就一直素底：人物照旧能转着看，不至于整块坏掉
+          peekBackdrop = 'solid';
+        });
+      } else {
+        peekBackdrop = 'solid';
+      }
     });
-    setTone(known ?? 'mid');
     return () => {
-      live = false;
+      cancelled = true;
     };
-  }, [open, skinUrl]);
+  }, [open, backdrop]);
 
   /** 换动作：每次换都得新建实例（库的动画把进度存在实例里）。 */
   useEffect(() => {
@@ -522,11 +562,12 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
           </Button>
         </div>
 
-        <div className={styles.stage} data-skin-modal-stage="" data-skin-tone={tone}>
+        <div className={styles.stage} data-skin-modal-stage="">
           <canvas
             ref={canvasRef}
             className={styles.canvas}
             data-skin-modal-canvas=""
+            data-skin-modal-backdrop={backdrop}
             data-skin-modal-animation={animation}
             data-skin-modal-speed={speed.toFixed(1)}
             data-skin-modal-rotate={autoRotate ? 'on' : 'off'}
@@ -571,6 +612,25 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
                   data-skin-modal-speed-button={preset.toFixed(1)}
                   onClick={() => setSpeed(preset)}>
                   {preset}×
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.row}>
+            <span className={styles.label}>背景</span>
+            <div className={styles.backgrounds}>
+              {/* 两个按钮而不是一个开关：这是「二选一」，不是「开/关」——
+                  开关的样式会让人以为「关掉」= 没有背景。 */}
+              {BACKDROPS.map((item) => (
+                <Button
+                  key={item.value}
+                  variant="secondary"
+                  active={item.value === backdrop}
+                  aria-pressed={item.value === backdrop}
+                  data-skin-modal-backdrop-button={item.value}
+                  onClick={() => setBackdrop(item.value)}>
+                  {item.label}
                 </Button>
               ))}
             </div>

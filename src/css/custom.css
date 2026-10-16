@@ -93,3 +93,25 @@ html[data-theme='dark'] .theme-announcement-bar {
 .theme-announcement-bar {
   font-weight: 600;
 }
+
+/*
+ * 皮肤视图的**素底**色（实景没就位时、或用户主动切成素底时压在 3D 场景上的一块纯色）。
+ *
+ * 它 = 「`static/mc/blocks/stone.png` 上叠一层本主题的 `--skin-veil`」的**合成色**，
+ * 也就是卡片 / 弹窗那两层 CSS 底纹真正画出来的颜色。两者必须一致：3D 画布是不透明的
+ * （库建 `WebGLRenderer` 时没开 `alpha`），人物一画上去就把 CSS 底纹整个盖住 ——
+ * 素底只能由 three 的 `scene.background` 给出，见 `src/components/skinBackdrop.ts`。
+ *
+ * 合成公式（石头均值 125.5，与 `stone.png` 的实测均值同值）：
+ *   浅 0.9 × (250,251,252) + 0.1 × 125.5 = (237.6, 238.5, 239.4) → #EEEEEF
+ *   深 0.88 × (17,21,26)   + 0.12 × 125.5 = (30.0, 33.5, 37.9)  → #1E2226
+ * 两处 `--skin-veil` 的配方在 `SkinViewer/styles.module.css` 与 `SkinModal/styles.module.css`；
+ * `verify/site-check.cjs` 会读它们与这张石头贴图现推这两个值，对不上就红。
+ */
+:root {
+  --skin-solid: #eeeeef;
+}
+
+[data-theme='dark'] {
+  --skin-solid: #1e2226;
+}

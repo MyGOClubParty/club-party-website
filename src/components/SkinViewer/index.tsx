@@ -1,8 +1,8 @@
 import {useEffect, useRef, useState, type ReactNode} from 'react';
 import clsx from 'clsx';
 
+import {SKIN_PANORAMA, solidBackdrop, type SkinBackdrop} from '../skinBackdrop';
 import {applyDefaultPose} from '../skinPose';
-import {measureSkinTone, rememberSkinTone, skinToneOf, type SkinTone} from '../skinTone';
 import styles from './styles.module.css';
 
 /**
@@ -66,13 +66,15 @@ import styles from './styles.module.css';
  * 不低于 1（等于显示密度，不放大），不高于 3（封顶填充率）。舞台再抬一档到至少 2，
  * 让 dpr=1 的屏幕也能靠缩采样拿到干净的边缘。
  *
- * ## 衬底按**皮肤**的明暗选，不按主题（2026-10-16）
+ * ## 人物站在实景里，不再是两种纯色之间挑一个（2026-10-16）
  *
  * 面板原本只跟主题走：浅色主题压一层白罩子。可皮肤和主题没关系 —— 浅色皮肤坐在浅底上实测
  * 轮廓像素平均 1.34:1、86.6% 低于 1.6:1，人就是一坨白（`verify/_probe-skin-legibility.cjs`）。
- * 现在每张皮肤量一次明暗（口径与判据写在 `components/skinTone.ts`），结果落在 `.viewer` 的
- * `data-skin-tone` 上，压哪块底交给 CSS。**量的时机在皮肤图到手那一刻**（下面 `requestSkin`
- * 的 load 分支），所以第一帧的底就是对的：不会先按主题的底画、图到了再翻一下。
+ * 中间那版「量皮肤明暗、浅皮肤压深底」还是**在两种纯色之间挑**，黑白相间的皮肤两边都分不掉。
+ * 现在改成把人物放进 Minecraft 实景：舞台建好就把一张 equirectangular 全景
+ * （`SKIN_PANORAMA`）贴到 `scene.background` 上，明暗层次是图里本来就有的。
+ * 背景的两件事与素底色写在 `components/skinBackdrop.ts`；全景到位之前、以及取不回来时
+ * 压一块跟主题走的素底，别黑屏。
  */
 
 /** 卡片的四个状态，落在 `data-mode` 上（验收断言读的就是它）。
@@ -109,6 +111,11 @@ type StageViewer = {
   zoom: number;
   /** 改它会同时改绘制缓冲与合成器尺寸（库的 setter 里做全了） */
   pixelRatio: number | 'match-device';
+  /** 场景背景。全景贴上去之后是库建的 Texture，素底是一块 Color —— 两种都不必把 three 的
+   *  类型图拉进站点的 typecheck，写进来的一律是 `string`（库的 setter 收 `ColorRepresentation`）。 */
+  background: unknown;
+  /** 贴 equirectangular 全景。**传 URL 时是异步的**（库里先 `loadImage` 再建 Texture）。 */
+  loadPanorama: (source: string) => Promise<void>;
   dispose: () => void;
 };
 
@@ -147,6 +154,10 @@ type Stage = {
   cssHeight: number;
   /** 上一次设进 viewer 的 pixelRatio —— 显示密度变了才需要重设 */
   ratio: number;
+  /** 此刻压在场景上的是哪种背景。全景还没贴上来（或取不回来）时是素底，`paint` 负责让它跟着主题走。 */
+  backdrop: SkinBackdrop;
+  /** 上一次设进去的素底色，没变就不用再碰 `background`（每写一次库都会新建一个 Color）。 */
+  solid: string | null;
 };
 
 /** 卡片画布相对 CSS 像素的倍数下限：等于显示密度，低于它浏览器就要放大、就糊。 */
@@ -286,9 +297,6 @@ function requestSkin(
     image.addEventListener('load', () => {
       record.state = 'ready';
       record.image = image;
-      // 顺手把这身皮肤的明暗量一次（见文件头「衬底按皮肤明暗选」）：图就在手里，
-      // 在这一步量既省掉一次重复取图，也让卡片第一帧就压在正确的底上。
-      rememberSkinTone(skin, measureSkinTone(image));
       const waiters = record.waiters.splice(0, record.waiters.length);
       for (const waiter of waiters) waiter(image);
       markDirty();
@@ -355,6 +363,8 @@ function paint(now: number): void {
   if (!current) return;
   dirty = false;
   syncCardRatio();
+  // 素底跟着主题走（主题切了、而全景还没贴上来时）：每帧一次字符串比较，不值钱的守卫
+  if (current.backdrop === 'solid') applySolid(current);
 
   const visible: Card[] = [];
   for (const card of cards) {
@@ -437,6 +447,21 @@ function paint(now: number): void {
   }
 }
 
+/**
+ * 把素底压到场景上（颜色从 `--skin-solid` 现读，见 `components/skinBackdrop.ts`）。
+ *
+ * **每帧都可以调**：现读到的颜色没变就直接返回（一次字符串比较），变了才写 `background`
+ * —— 库的 setter 每写一次都要新建一个 `Color`，不值得每帧都建。主题切了、而全景又还没贴上来
+ * （或者压根没取回来）时，就靠它跟上。
+ */
+function applySolid(record: Stage): boolean {
+  const color = solidBackdrop();
+  if (!color || color === record.solid) return false;
+  record.solid = color;
+  record.viewer.background = color;
+  return true;
+}
+
 /** 懒建全站唯一的那个舞台。失败就记住，别让每张卡片都重试一遍。 */
 function ensureStage(): Promise<Stage | null> {
   if (stagePromise) return stagePromise;
@@ -467,8 +492,34 @@ function ensureStage(): Promise<Stage | null> {
       // 末尾那次 `controls.update()` 定下来 —— 摆位顺序（fov/zoom 先、`camera.position` 最后）
       // 也在那边的注释里，别挪。
       applyDefaultPose(viewer);
-      stage = {viewer, skin: null, cssWidth: 0, cssHeight: 0, ratio: stageRatio()};
-      return stage;
+      const record: Stage = {
+        viewer,
+        skin: null,
+        cssWidth: 0,
+        cssHeight: 0,
+        ratio: stageRatio(),
+        backdrop: 'solid',
+        solid: null,
+      };
+      stage = record;
+      // 素底先顶上：全景是异步来的（还得解码一张 4K 图），中间这几百毫秒不能是一块黑屏
+      canvas.dataset.skinBackdrop = 'solid';
+      applySolid(record);
+      /*
+       * 实景。取不回来（404 / 断网 / 解码失败）就**一直是素底** —— 一张背景图不该把整块舞台弄坏，
+       * 人物照旧能看。两种结果都落在 `data-skin-backdrop` 上，验收读它。
+       */
+      void viewer.loadPanorama(SKIN_PANORAMA).then(
+        () => {
+          record.backdrop = 'panorama';
+          canvas.dataset.skinBackdrop = 'panorama';
+          markDirty();
+        },
+        () => {
+          canvas.dataset.skinBackdrop = 'solid';
+        },
+      );
+      return record;
     } catch {
       // 没有 GPU、上下文没批下来……所有卡片停在 2D 头像上，不再重试
       stageFailed = true;
@@ -578,12 +629,6 @@ export default function SkinViewer({skin, label, className}: SkinViewerProps): R
   const hostRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mode, setMode] = useState<CardMode>('pending');
-  /**
-   * 这身皮肤的明暗 → 压哪块底（见文件头）。`null` = 还没量出来，按 `mid` 渲染 ——
-   * 也就是「跟着主题走」，和这个功能之前的行为一样，所以量不出来（没有 WebGL、
-   * 图取不回来）时卡片也不会变成一坨怪东西。
-   */
-  const [tone, setTone] = useState<SkinTone | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -666,9 +711,6 @@ export default function SkinViewer({skin, label, className}: SkinViewerProps): R
 
     // 先把皮肤取回来，进视口时才有东西可画（同 URL 只取一次）
     requestSkin(skin);
-    // 衬底：同上，量过就直接用，没量过就等 `requestSkin` 的 load 分支把结果记进来（同 URL 只量一次）
-    const knownTone = skinToneOf(skin, setTone);
-    if (knownTone) setTone(knownTone);
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -709,7 +751,6 @@ export default function SkinViewer({skin, label, className}: SkinViewerProps): R
       ref={hostRef}
       className={clsx(styles.viewer, className)}
       data-mode={mode}
-      data-skin-tone={tone ?? 'mid'}
       data-skin-viewer={skin}
       role="img"
       aria-label={label}

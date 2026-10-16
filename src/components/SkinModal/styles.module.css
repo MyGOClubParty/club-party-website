@@ -62,9 +62,14 @@
   overflow-wrap: anywhere;
 }
 
-/* 3D 舞台：底纹与卡片里的 3D 区完全一致（石头 + 罩子 + 斜角，罩子最后按皮肤明暗定，
-   见下面那两条），一眼能认出「这就是刚才那格，放大了」。
-   高度跟着视口收，矮屏上不至于把控制区顶出屏幕。 */
+/* 3D 舞台：底纹与卡片里的 3D 区完全一致（石头 + 罩子 + 斜角），一眼能认出「这就是刚才那格，
+   放大了」。高度跟着视口收，矮屏上不至于把控制区顶出屏幕。
+   ⚠️ 这层底纹现在**只在画布还没出图时**看得见（典型是开不了 WebGL 那一屏）：3D 画布是不透明的，
+   人物一画上去就把它整个盖住。盖在上面的是 **Minecraft 实景全景**（默认）或一块跟主题走、
+   与这里同色的**素底** —— 两者都归 three 的 `scene.background` 管，见
+   `src/components/skinBackdrop.ts`，素底色是 `src/css/custom.css` 的 `--skin-solid`。
+   上一版那两条 `.stage[data-skin-tone='...']`（按皮肤明暗在两种纯色之间挑）已经删掉 ——
+   黑白相间的皮肤两边都分不掉，判据再准也没用，改成实景了（理由同 `SkinViewer/styles.module.css`）。 */
 .stage {
   --skin-veil: rgba(250, 251, 252, 0.9);
   position: relative;
@@ -83,18 +88,6 @@
 
 [data-theme='dark'] .stage {
   --skin-veil: rgba(17, 21, 26, 0.88);
-}
-
-/* 衬底按**皮肤**的明暗定，不按主题 —— 与卡片里那两条完全同义（口径、判据、写法都在
-   `components/skinTone.ts` 与 `SkinViewer/styles.module.css`，这里只是把类名换成 `.stage`）。
-   弹窗是「把那格放大」，卡片换了底弹窗不换就等于点开时闪一下另一种底。
-   同样：**必须排在 `[data-theme='dark'] .stage` 之后**，特异度打平、靠源码顺序取胜。 */
-.stage[data-skin-tone='light'] {
-  --skin-veil: rgba(17, 21, 26, 0.88);
-}
-
-.stage[data-skin-tone='dark'] {
-  --skin-veil: rgba(250, 251, 252, 0.9);
 }
 
 /* three 会给画布写死 px 的 style.width/height，所以这里用绝对定位：
@@ -165,6 +158,13 @@
 .speeds {
   display: flex;
   flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+/* 背景二选一（实景 / 素底）。两个按钮固定宽度、并排，不做成一整行的 4 列 ——
+   跟旁边那行 8 个动作按钮对齐反而会显得「这也是动作」。 */
+.backgrounds {
+  display: flex;
   gap: 0.35rem;
 }
 
