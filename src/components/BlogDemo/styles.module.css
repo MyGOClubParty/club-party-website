@@ -1,0 +1,70 @@
+/* 文章里的互动演示面板：与名单卡片、社团卡片是同一套 MC 深色 GUI 语言。
+   深色是**固定**的（不随站点主题翻转），所以里面必须自己声明 color 与背景色。 */
+
+.demo {
+  margin: 1.6rem 0;
+  padding: 0.85rem 0.9rem 0.7rem;
+  color: var(--text-color, #fff);
+  background-color: var(--background-color, #23232a);
+  font-family: Minecraft, Minercraftory, var(--ifm-font-family-base);
+  box-shadow:
+    inset 0 -3px 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset -3px 0 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 0 3px 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4)),
+    inset 3px 0 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+/* 「互动」两个字单独一个牌子：读者一眼知道这块可以动手，而不是一张图 */
+.badge {
+  padding: 0.1rem 0.4rem;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-color-invert, #23232a);
+  background-color: var(--success-color, #89ffb2);
+}
+
+.title {
+  font-size: 0.95rem;
+}
+
+.hint {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--secondary-color, #d0d1d4);
+}
+
+.body {
+  /* 面板里的一切都归演示组件自己排版 */
+  display: block;
+}
+
+.note {
+  margin: 0.75rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: var(--ifm-font-family-base);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--secondary-color, #d0d1d4);
+}
+
+@media screen and (max-width: 640px) {
+  .demo {
+    margin: 1.2rem 0;
+    padding: 0.7rem 0.65rem 0.6rem;
+  }
+
+  .hint {
+    margin-left: 0;
+    width: 100%;
+  }
+}

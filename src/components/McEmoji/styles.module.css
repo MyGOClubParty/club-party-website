@@ -1,0 +1,9 @@
+/* 行内贴图：跟字号走，落在基线上一点，放大不做插值（原版贴图是像素画）。 */
+.emoji {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  /* 贴图的本体大多只占 16×16 里的中下部，纯几何对齐会看着偏高 */
+  vertical-align: -0.14em;
+  image-rendering: pixelated;
+}

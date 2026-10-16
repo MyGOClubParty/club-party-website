@@ -1,0 +1,35 @@
+/* 「放烟花」演示：一片夜空 + 画布 + 一颗按钮。粒子颜色是引擎按原版烟花贴图配的，这里只给底。 */
+
+.sky {
+  position: relative;
+  height: 240px;
+  overflow: hidden;
+  /* 夜空：深色面板上再压一层蓝紫，烟花才炸得出来 */
+  background:
+    radial-gradient(circle at 50% 110%, rgba(88, 122, 214, 0.35) 0%, transparent 62%),
+    linear-gradient(#0b1020, #151a2e);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+/* 画布是 absolute inset:0（引擎按画布尺寸算粒子），按钮得自己浮在上面 */
+.inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+
+.icon {
+  width: 1.05em;
+  height: 1.05em;
+  margin-right: 0.45rem;
+  vertical-align: -0.15em;
+  image-rendering: pixelated;
+}
+
+@media screen and (max-width: 640px) {
+  .sky {
+    height: 190px;
+  }
+}

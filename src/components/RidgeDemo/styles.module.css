@@ -1,0 +1,123 @@
+/* 「土画在列上 / 一整块」演示。比例一律走 --unit（一格），与首页同一条规矩。 */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.groupLabel {
+  font-size: 0.8rem;
+  color: var(--secondary-color, #d0d1d4);
+}
+
+/* 两个按钮贴在一起（库的 ButtonGroup 只吃 value/options，这里要带 data-* 锚点，所以自己排） */
+.pair {
+  display: flex;
+}
+
+.pair > * {
+  flex: 1;
+}
+
+.stage {
+  display: flex;
+  align-items: flex-end;
+  padding: 0 0 0 1px;
+  min-height: calc(var(--unit) * (var(--maxh) + 2));
+  overflow-x: auto;
+  /* 夜空底色：土与草是深色像素画，纯黑底看不出边缘 */
+  background-color: #10141c;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+/* 一整排山脊：宽度由「列数 × 列宽 × 一格」推出来 */
+.hill {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  width: calc(var(--colw) * var(--unit) * var(--cols));
+  height: calc(var(--unit) * var(--maxh));
+}
+
+/* 一整块土体：铺满整层、底边落在地平线上，形状交给 clip-path（相位全局一致，不可能有接缝） */
+.mass {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('/mc/blocks/dirt.png');
+  background-repeat: repeat;
+  background-size: var(--unit) var(--unit);
+  image-rendering: pixelated;
+}
+
+.col {
+  position: relative;
+  flex: 0 0 calc(var(--colw) * var(--unit));
+  height: calc(var(--blocks) * var(--unit));
+}
+
+/* 当年：每列自己画土 —— 每根柱子都从自己的左边缘起铺贴图，列与列之间必然错相位 */
+.colDirt {
+  position: absolute;
+  inset: 0;
+  background-image: url('/mc/blocks/dirt.png');
+  background-repeat: repeat;
+  background-size: var(--unit) var(--unit);
+  image-rendering: pixelated;
+}
+
+/* 草色顶边 = 一格的四分之一，钉在每列自己的顶边上（两种画法都有它） */
+.colGrass {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--unit) / 4);
+  background-image: url('/mc/blocks/grass_block_side.png');
+  background-size: var(--unit) var(--unit);
+  background-repeat: repeat-x;
+  image-rendering: pixelated;
+}
+
+/* 诊断标尺：贴图每隔一格重新开始的位置。跨整层一条（相位全局）或每列一条（各起各的）——
+   线距在哪儿突然变窄，接缝就在哪儿。 */
+.ticks,
+.colTicks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to right,
+    rgba(255, 214, 102, 0.55) 0 1px,
+    transparent 1px var(--unit)
+  );
+}
+
+.hint {
+  margin: 0.7rem 0 0;
+  font-family: var(--ifm-font-family-base);
+  font-size: 0.8rem;
+  line-height: 1.65;
+  color: var(--secondary-color, #d0d1d4);
+}
+
+@media screen and (max-width: 640px) {
+  .controls {
+    gap: 0.6rem;
+  }
+
+  .group {
+    flex-wrap: wrap;
+  }
+}

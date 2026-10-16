@@ -17,3 +17,8 @@ guide:
   label: 参与指南
   permalink: /guide
   description: 报名、连接、打卡等操作指引
+
+behind-the-scenes:
+  label: 幕后
+  permalink: /behind-the-scenes
+  description: 这个网站是怎么做出来的 —— 页面里那些细节的来龙去脉

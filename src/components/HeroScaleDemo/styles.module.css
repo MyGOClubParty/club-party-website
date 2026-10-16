@@ -1,0 +1,227 @@
+/* 「一格 = 多少像素」演示。舞台本身是固定深色的（面板语言），所以贴图配深底、
+   网格线用半透明白 —— 两个主题下都看得见。 */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.9rem;
+}
+
+.slider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1 1 15rem;
+  min-width: 0;
+}
+
+.sliderLabel {
+  font-size: 0.85rem;
+  color: var(--secondary-color, #d0d1d4);
+}
+
+/* 原生 range 自己画：库里的 Slider 在非整数区间上会炸 SSG（见 SkinModal 顶部注释），
+   一个滑块不值得为它引一个组件。 */
+.slider input {
+  flex: 1;
+  min-width: 6rem;
+  height: 8px;
+  appearance: none;
+  background-color: var(--secondary-color, #d0d1d4);
+  box-shadow:
+    inset 0 -2px 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 0 2px 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
+  cursor: pointer;
+}
+
+.slider input::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 20px;
+  background-color: var(--primary-color, #3b8526);
+  box-shadow:
+    inset 0 -2px 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset -2px 0 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 0 2px 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4)),
+    inset 2px 0 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
+}
+
+.slider input::-moz-range-thumb {
+  width: 14px;
+  height: 20px;
+  border: none;
+  border-radius: 0;
+  background-color: var(--primary-color, #3b8526);
+}
+
+.sliderValue {
+  min-width: 4.5rem;
+  font-size: 0.9rem;
+  text-align: right;
+  color: var(--text-color, #fff);
+}
+
+.presets {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* 两栏等宽，窄屏自动叠起来 */
+.stages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.panel {
+  min-width: 0;
+}
+
+.panelTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.5rem;
+  font-family: Minecraft, Minercraftory, var(--ifm-font-family-base);
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-color, #fff);
+}
+
+.dotOk,
+.dotBad {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+}
+
+.dotOk {
+  background-color: var(--success-color, #89ffb2);
+}
+
+.dotBad {
+  background-color: var(--error-color, #ff8383);
+}
+
+/* 舞台：底边就是地平线，土体与火把都贴着它往上堆 */
+.stage {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 190px;
+  overflow: hidden;
+  /* 夜空底色：贴图是深色像素画，纯黑底看不出边缘 */
+  background-color: #10141c;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+/* 一格网格。锚在左下角，所以横线一定与地平线对齐 —— 数格子就是数事实。 */
+.ruler {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(to right, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px var(--unit)),
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px var(--unit));
+  background-position: left bottom;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.stack {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* 火把盒子：宽高都由 --torch 定，贴图铺满盒子（原版贴图是像素画，不做插值）。
+   左栏 --torch 就是一格，右栏是写死的 32px —— 差别全在这一个变量上。 */
+.propSlot {
+  display: block;
+  width: var(--torch);
+  height: var(--torch);
+}
+
+.torch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+
+.ground {
+  position: relative;
+  display: block;
+  width: var(--unit);
+  height: calc(var(--unit) * 3);
+  background-image: url('/mc/blocks/dirt.png');
+  background-size: var(--unit) var(--unit);
+  background-repeat: repeat;
+  image-rendering: pixelated;
+}
+
+/* 草色顶边 = 一格的四分之一：元素只有 unit/4 高，背景按一格平铺，取到的正是贴图最上面 4 行 */
+.grassBand {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--grass);
+  background-image: url('/mc/blocks/grass_block_side.png');
+  background-size: var(--unit) var(--unit);
+  background-repeat: repeat-x;
+  image-rendering: pixelated;
+}
+
+.readout {
+  margin-top: 0.6rem;
+  font-family: var(--ifm-font-family-base);
+  font-size: 0.78rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 5.4rem 1fr auto;
+  gap: 0.4rem;
+  align-items: baseline;
+  padding: 0.16rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.rowLabel {
+  color: var(--secondary-color, #d0d1d4);
+}
+
+.rowPx {
+  color: var(--text-color, #fff);
+}
+
+.rowBlocks {
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-color, #d0d1d4);
+}
+
+/* 超过一格就变红：这正是「道具比方块还大」的那一档 */
+.rowBlocks[data-over='yes'] {
+  color: var(--error-color, #ff8383);
+}
+
+.legend {
+  margin: 0.75rem 0 0;
+  font-family: var(--ifm-font-family-base);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--secondary-color, #d0d1d4);
+}
+
+@media screen and (max-width: 640px) {
+  .stages {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stage {
+    height: 160px;
+  }
+}

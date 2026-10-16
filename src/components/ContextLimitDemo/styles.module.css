@@ -1,0 +1,130 @@
+/* 「同时能养几个 3D 视图」演示：一排小卡片 + 三个计数器。
+   卡片用石头贴图当「活着的画布」，被丢掉的那几张就真的什么都没有。 */
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.label {
+  color: var(--secondary-color, #d0d1d4);
+}
+
+.counter {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.count {
+  min-width: 2.2rem;
+  text-align: center;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.meters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+  font-family: var(--ifm-font-family-base);
+  font-size: 0.78rem;
+}
+
+.meter {
+  padding: 0.2rem 0.55rem;
+  color: var(--text-color, #fff);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.meter b {
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 超限的两个计数器变红：这就是当年「有的卡片没加载出来」的那一刻 */
+.meter[data-over='yes'] {
+  color: #1b1b21;
+  background: var(--error-color, #ff8383);
+}
+
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  margin: 0;
+  list-style: none;
+  background: #10141c;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.card {
+  position: relative;
+  width: 44px;
+  height: 58px;
+  background-color: #23232a;
+  background-image: linear-gradient(rgba(17, 21, 26, 0.55), rgba(17, 21, 26, 0.55)),
+    url('/mc/blocks/stone.png');
+  background-size: auto, 32px 32px;
+  image-rendering: pixelated;
+  box-shadow:
+    inset 0 -2px 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 2px 0 0 0 var(--bezel-color, rgba(0, 0, 0, 0.4)),
+    inset 0 2px 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4)),
+    inset -2px 0 0 0 var(--bezel-color-invert, rgba(255, 255, 255, 0.4));
+}
+
+/* 上下文被丢掉的那几张：真的什么都没有，只剩一个叉 */
+.card[data-card='blank'] {
+  background-color: #0c0f16;
+  background-image: none;
+}
+
+.blankMark::after {
+  content: '✕';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.9rem;
+  color: rgba(255, 131, 131, 0.5);
+}
+
+.verdict {
+  margin: 0.7rem 0 0;
+  font-family: var(--ifm-font-family-base);
+  font-size: 0.8rem;
+  line-height: 1.65;
+  color: var(--secondary-color, #d0d1d4);
+}
+
+.verdict[data-verdict='over'] {
+  color: var(--error-color, #ff8383);
+}
+
+.verdict[data-verdict='shared'] {
+  color: var(--success-color, #89ffb2);
+}
+
+@media screen and (max-width: 640px) {
+  .controls {
+    gap: 0.6rem;
+  }
+
+  .card {
+    width: 36px;
+    height: 48px;
+  }
+}

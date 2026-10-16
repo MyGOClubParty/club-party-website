@@ -1,0 +1,136 @@
+/* HUD 物品栏（原首页 index.module.css 的「物品栏」一段，2026-10-16 抽出来与文章共用）。
+   与首页相处时行为完全不变：`@keyframes rise` 的入场延迟、窄屏的下边距、减少动效时的降级
+   都跟着一起搬过来了 —— CSS Module 的 keyframes 是按文件作用域哈希的，所以这里必须自带一份。 */
+
+.hotbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 1.6rem;
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: 0.47s;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * 原版快捷栏贴图 182×22：x=0 左黑边、x=1..180 是 9 个格子、x=181 右黑边，格子 20×20。
+ * 我们只出 `--slots` 格（= 社团数），宽 = (1 + n×20 + 1) × 2，格子几何照原版放大 2 倍。
+ *
+ * 贴图里没有「第 7 格右边缘」这种东西（x=141 处是第 8 格的起始），所以右黑边必须
+ * **另取贴图第 181 列**补在右边缘：`::after` 把同一张贴图平移 -362px（= 181 × 2）
+ * 贴在一个 2px 宽的窄条上，取到的正好是那一列。少了它框的右边就是断的。
+ */
+.hotbarFrame {
+  position: relative;
+  width: calc(var(--slots) * 40px + 4px);
+  height: 44px;
+  background-image: url('/mc/gui/hotbar.png');
+  background-repeat: no-repeat;
+  background-size: 364px 44px;
+  image-rendering: pixelated;
+  /* 贴图本身是半透明深色，加一层投影把整个 HUD 从地形上拎起来 */
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+}
+
+.hotbarFrame::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 2px;
+  height: 44px;
+  background-image: url('/mc/gui/hotbar.png');
+  background-repeat: no-repeat;
+  background-size: 364px 44px;
+  background-position: -362px 0;
+  image-rendering: pixelated;
+}
+
+.hotSlot {
+  position: absolute;
+  top: 2px;
+  left: calc(2px + var(--i) * 40px);
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 2px;
+  transition:
+    transform 0.18s ease,
+    filter 0.18s ease;
+}
+
+.hotSlot:hover,
+.hotSlot:focus-visible {
+  z-index: 2;
+  transform: scale(1.1);
+  filter: brightness(1.3) drop-shadow(0 0 7px rgba(255, 238, 168, 0.9));
+}
+
+/* 社团 logo 既有照片也有矢量徽章，一律走默认平滑，不用 pixelated */
+.hotIcon {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.hotName {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.hotSlot:hover .hotName,
+.hotSlot:focus-visible .hotName {
+  opacity: 1;
+}
+
+/*
+ * HUD 底下那行提示。字色跟着主题走：`--hero-hint` / `--hero-shadow` 由首页 hero 定义
+ * （CSS 变量会继承下来，所以放在 hero 里时取到的就是 hero 那一套，夜里白字 / 白天深字）。
+ * 文章里没有这两个变量，兜底值按深色面板给 —— 不透明度是量出来的：原来的取值见
+ * verify/probe-home-colors.cjs（按最坏情况取两个主题里对比度更低的那一侧，AA 要 ≥ 4.5）。
+ */
+.hotHint {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--hero-hint, rgba(255, 255, 255, 0.72));
+  text-shadow: var(--hero-shadow, 0 1px 10px rgba(0, 0, 0, 0.9));
+}
+
+@media screen and (max-width: 996px) {
+  .hotbar {
+    margin-top: 1.1rem;
+  }
+}
+
+/* 系统要求减少动效：入场动画与格位缩放一律停掉 */
+@media screen and (prefers-reduced-motion: reduce) {
+  .hotbar,
+  .hotSlot {
+    animation: none;
+    transition: none;
+  }
+}
