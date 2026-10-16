@@ -40,6 +40,32 @@
  * 见下面的 `panoramaBitmap()`。它同时兼一份**按 URL 的缓存**：同一张图无论多少消费者，
  * 都只下载、只解码一次。
  *
+ * ## ⚠️ 解码时要显式 `imageOrientation: 'flipY'`，否则实景上下颠倒
+ *
+ * 这条是 2026-10-16 踩出来的：卡片背景刚从「传 URL」改成「传 ImageBitmap」，实景就**倒过来了**
+ * —— 草在天上、天空在脚底（读者截图）。
+ *
+ * 根因在**浏览器**这一侧，不在 three：three 对每次纹理上传都执行
+ * `pixelStorei(UNPACK_FLIP_Y_WEBGL, texture.flipY)`（0.156.1 里是无条件的，见
+ * `three/build/three.module.js:24256`），而 `Texture.flipY` 默认 `true`。可 WebGL 规范给
+ * `ImageBitmap` 单开了一条：**源是 ImageBitmap 时 `UNPACK_FLIP_Y_WEBGL` 被忽略**，
+ * 改用它自己的 `imageOrientation`。于是 that 那句 `pixelStorei` 对 bitmap 白设，
+ * 图就这么上下颠倒地被贴上了 —— 而 `<img>` 那条路一直靠它翻正。
+ *
+ * 实测（`verify/_probe-flipy.cjs`：造一张「上红下蓝」的图，三种源各上传一次再读屏幕上下沿）：
+ *
+ * | 源 | `UNPACK_FLIP_Y_WEBGL` | 结果 |
+ * |---|---|---|
+ * | `<img>` | `false` | 上蓝下红（颠倒） |
+ * | `<img>` | `true` | **上红下蓝（正）** —— 对 `<img>` 生效 |
+ * | `ImageBitmap`（默认解码） | `true` | 上蓝下红（颠倒）—— **被忽略** |
+ * | `ImageBitmap`（解码时 `flipY`） | 两个值都一样 | **上红下蓝（正）** |
+ *
+ * 所以修法只有一处：解码时把它翻掉，`pixelStorei` 那边一个字都不用动。
+ * `premultiplyAlpha: 'none'` 同理 —— 它也属于「对 ImageBitmap 被忽略、得在解码时定」的那组，
+ * 与 three `ImageBitmapLoader` 的默认一致（three 自己的 loader 默认就是
+ * `{premultiplyAlpha: 'none'}`）。
+ *
  * ## 素底还剩两件事要做
  *
  * 1. **全景没就位时不黑屏**：全景是异步来的（还得解码），贴上去之前总得有个底 ——
@@ -162,7 +188,10 @@ export function panoramaBitmap(url: string, onProgress?: PanoramaProgressHandler
     }
 
     onProgress?.({phase: 'decode', loaded: blob.size, total, ratio: null});
-    const bitmap = await createImageBitmap(blob);
+    // ⚠️ 这两个选项是**必须**的，不是调优：WebGL 对 ImageBitmap 忽略 UNPACK_FLIP_Y_WEBGL
+    // 与 UNPACK_PREMULTIPLY_ALPHA_WEBGL，朝向与预乘只能在解码时定下来（见文件头）。
+    // 少了 flipY，整张实景就会上下颠倒 —— 而这件事 typecheck、build、别的断言**全都看不见**。
+    const bitmap = await createImageBitmap(blob, {imageOrientation: 'flipY', premultiplyAlpha: 'none'});
     onProgress?.({phase: 'done', loaded: blob.size, total, ratio: 1});
     return bitmap;
   })();
