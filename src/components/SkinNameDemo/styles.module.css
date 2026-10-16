@@ -140,17 +140,14 @@
   margin-left: auto;
 }
 
+/* 说明文字落在面板的固定深色上，颜色自己声明；里面的 <code> 不在这里补配色 ——
+   面板底色只有 BlogDemo 知道，那份兜底统一在它那儿（见 BlogDemo/styles.module.css）。 */
 .pathHint {
   margin: 0.7rem 0 0;
   font-family: var(--ifm-font-family-base);
   font-size: 0.78rem;
   line-height: 1.65;
   color: var(--secondary-color, #d0d1d4);
-}
-
-.pathHint code {
-  color: var(--text-color, #fff);
-  background: rgba(0, 0, 0, 0.35);
 }
 
 .pathHint b {

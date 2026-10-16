@@ -57,6 +57,38 @@
   color: var(--secondary-color, #d0d1d4);
 }
 
+/*
+ * 面板内的行内代码与链接要在这里兜底，不能让它们继承站点主题的那一套。
+ *
+ * 面板是**固定深色**的，而 `<code>` 的底色来自 Docusaurus 的主题变量：浅色页面下就变成
+ * 「深底上垫一块浅灰」，字色又继承本面板的白色 —— 白字白底，读者只看得见几个浅色方块
+ * （2026-10-16 读者反馈「这个位置看不太清」就是这个）。链接同理：浅色主题的深绿
+ * `#2e8555` 落在 `#23232a` 上只有 3.4:1，而 note 是 12.5px 的小字。
+ *
+ * 归口在这里是因为 note 是面板渲染的 —— 各演示组件内部若有自己的代码块样式
+ * （曾经 SkinNameDemo 的 .pathHint code 就单补过一条），那属于重复，应删掉用这份。
+ */
+.demo code {
+  padding: 0.08em 0.35em;
+  border: none;
+  border-radius: 0;
+  color: var(--text-color, #fff);
+  background-color: rgba(0, 0, 0, 0.45);
+  overflow-wrap: anywhere;
+}
+
+.demo a {
+  color: var(--success-color, #89ffb2);
+  text-decoration: underline;
+  /* 下划线贴字太紧，小字里会糊在一起 */
+  text-underline-offset: 0.18em;
+}
+
+.demo a:hover {
+  /* 库里只定义了 --success-color，没有它的 hover 变体 —— 自己提亮一档 */
+  color: #b6ffd0;
+}
+
 @media screen and (max-width: 640px) {
   .demo {
     margin: 1.2rem 0;
