@@ -31,9 +31,14 @@ interface Env {
 /**
  * `worker/schema.sql` 是以**文本**模块导入的（`import schemaSql from './schema.sql'`，
  * 见 worker/db.ts）。TypeScript 不认 `.sql` 后缀，所以在这儿给它一个字符串类型。
- * 真正把文件内容变成模块的是 **wrangler 内置的默认规则**（`type: "Text"`，globs 含
- * `**/*.sql`）—— 不用在 wrangler.jsonc 里自己再声明一条：自己声明会把默认那条挤掉
- * （默认还管着 .txt / .html），wrangler 会为此发一条 fallthrough 警告。
+ * 真正把文件内容变成模块的是 **wrangler 内置的默认规则**（`type: "Text"`，globs 覆盖
+ * 子目录里的全部 `.sql`）—— 不用在 wrangler.jsonc 里自己再声明一条：自己声明会把默认那条
+ * 挤掉（默认还管着 .txt / .html），wrangler 会为此发一条 fallthrough 警告。
+ *
+ * ⚠️ 上面那个 glob 别照原样写进来：它中间那三个字符是「星号紧接星号紧接斜杠」，而
+ * `/*` 开的块注释恰恰在那三个字符处**提前闭合** —— 后面的反引号随即被当成模板字符串起点，
+ * `tsc` 报「Unterminated template literal」。只有这道类型闸门会红：`docusaurus build` 与
+ * 页面渲染全都照常（2026-10-16 踩到，`67cbe0d` 带进来的）。
  */
 declare module '*.sql' {
   const content: string;
