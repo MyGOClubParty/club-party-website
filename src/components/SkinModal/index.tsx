@@ -1,8 +1,15 @@
 import {useCallback, useEffect, useRef, useState, type ReactNode} from 'react';
 import {Button, Switch, Tag} from '@iicemeta/minecraft-react-ui';
 
-import {SKIN_PANORAMA, solidBackdrop, type SkinBackdrop} from '../skinBackdrop';
+import {
+  SKIN_PANORAMA,
+  panoramaBitmap,
+  solidBackdrop,
+  type PanoramaProgress,
+  type SkinBackdrop,
+} from '../skinBackdrop';
 import {applyDefaultPose} from '../skinPose';
+import {resumeStage, suspendStage} from '../SkinViewer';
 import {skinBadge, type SkinSource} from '../skinSource';
 import styles from './styles.module.css';
 
@@ -38,13 +45,18 @@ import styles from './styles.module.css';
  *
  * ## 背景：默认实景，可以切回素底
  *
- * 打开时人物站在 **Minecraft 实景**里 —— 与卡片上看到的是同一个背景（同一张 equirectangular
- * 全景、同一个 `scene.background`，见 `components/skinBackdrop.ts`），所以点开不跳画面。
+ * 打开时人物站在 **Minecraft 实景**里 —— 与卡片上是**同一个场景、同一处取景**（同一张
+ * equirectangular 全景同一块区域，只是这里用完整那档 4096×2048，卡片用 2048×1024 那档，
+ * 见 `components/skinBackdrop.ts` 文件头），所以点开不跳画面。
  * 控制区里可以切到**素底**：想看清皮肤纹理（半透明外层、像素画）时，一块安静的纯色比实景好用。
  * 两种背景都落在画布的 `data-skin-modal-backdrop` 上，验收读它。
  *
- * 实景是「拉起来就贴」，不阻塞打开：`loadPanorama()` 是异步的，贴上来之前先压一块跟主题走的
- * 素底（`--skin-solid`），别让人对着黑屏等。取不回来也一直是素底 —— 一张背景图不该把弹窗弄坏。
+ * 实景是「拉起来就贴」，不阻塞打开：先压一块跟主题走的素底（`--skin-solid`），别让人对着
+ * 黑屏等；那张图自己读字节流取回来，所以**下载进度是真报出来的**（原版经验条那条进度条，
+ * 见 `LoadingBar`）。取不回来也一直是素底 —— 一张背景图不该把弹窗弄坏。
+ *
+ * 打开期间还会把网格那边的渲染停掉（`suspendStage`）：弹窗盖着的时候那十几张卡片一张都
+ * 看不见，可它们的循环照跑，两块 WebGL 上下文同时出图纯属白烧。
  *
  * ## 那些 `data-skin-modal-*` 属性
  *
@@ -172,8 +184,9 @@ type PeekViewer = {
   /** 场景背景。全景贴上去之后是库建的 Texture，素底是一块 Color —— 写进来的只有 `string`
    *  （库的 setter 收 `ColorRepresentation`），理由同 `SkinViewer` 那边。 */
   background: unknown;
-  /** 贴 equirectangular 全景。**传 URL 时是异步的**（库里先 `loadImage` 再建 Texture）。 */
-  loadPanorama: (source: string) => Promise<void>;
+  /** 贴 equirectangular 全景。**传 URL 时是异步的**（库里先 `loadImage` 再建 Texture）；
+   *  传 `ImageBitmap` 是同步的（返回 `void`）—— 我们走后者，好在解码之前插一段可量的下载进度。 */
+  loadPanorama: (source: string | ImageBitmap) => void | Promise<void>;
   loadSkin: (source: HTMLImageElement | string) => void | Promise<void>;
   setSize: (width: number, height: number) => void;
 };
@@ -223,6 +236,41 @@ let peekRatio = 0;
  * 也免得每次开关弹窗都重新解码那张 4K 图（画面会从素底闪一下才回实景）。
  */
 let peekBackdrop: SkinBackdrop | null = null;
+
+/**
+ * 实景加载条 —— 贴的是**原版经验条**（`/mc/gui/experience_bar_background.png` 是槽、
+ * `experience_bar_progress.png` 是填充，都是 182×5），跟热键栏一样是现成的游戏素材，
+ * 不必手画一条。位置就是原来那行提示（「拖拽旋转 · 滚轮缩放」）待的地方：画布底部。
+ *
+ * **三个阶段各自的说法**，因为真正能报百分比的只有第一个：
+ * - 下载：`Content-Length` 拿到了就报百分比；
+ * - 解码：`createImageBitmap()` 不给任何回调，**这一段没有百分比可报** —— 画一条自己动的
+ *   假进度才是骗人，所以这里走不定进度、并把话说清楚；
+ * - 铺开：贴到 `scene.background`（传 bitmap 是同步的，一闪而过）。
+ */
+function LoadingBar({progress}: {progress: PanoramaProgress}): ReactNode {
+  const ratio = progress.phase === 'download' ? progress.ratio : null;
+  const label =
+    progress.phase === 'download'
+      ? ratio === null
+        ? '正在取实景…'
+        : `正在取实景 ${Math.round(ratio * 100)}%`
+      : progress.phase === 'decode'
+        ? '正在解析实景…'
+        : '正在铺开实景…';
+  return (
+    <div className={styles.loading} role="status" aria-live="polite" data-skin-modal-loading={progress.phase}>
+      <span className={styles.loadingText}>{label}</span>
+      <span className={styles.track} data-skin-modal-loading-track="">
+        <span
+          className={styles.fill}
+          data-skin-modal-loading-fill={ratio === null ? 'indeterminate' : 'determinate'}
+          style={ratio === null ? undefined : {width: `${Math.round(ratio * 100)}%`}}
+        />
+      </span>
+    </div>
+  );
+}
 
 async function ensurePeekViewer(canvas: HTMLCanvasElement | null): Promise<PeekViewer | null> {
   if (peekViewer) return peekViewer;
@@ -305,6 +353,14 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
    * 每次进来都该是同一个起点。
    */
   const [backdrop, setBackdrop] = useState<SkinBackdrop>(DEFAULT_BACKDROP);
+
+  /**
+   * 实景的加载进度。`null` = 没在加载（还压在素底上、或者实景已经贴好了）。
+   *
+   * 每次打开都回到实景，所以「上次停在素底、这次又要贴回去」时进度条会再走一遍 ——
+   * 但那张图已经被 `panoramaBitmap()` 按 URL 缓存了，走的是缓存那一支，几乎立刻到位。
+   */
+  const [progress, setProgress] = useState<PanoramaProgress | null>(null);
 
   const close = useCallback(() => onClose(), [onClose]);
 
@@ -406,9 +462,11 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
    * 背景。与换人那个 effect 无关 —— 背景不跟着皮肤走（见文件头）。
    *
    * 依赖里没有 `skinUrl`：换人不该重贴一次背景。`backdrop === peekBackdrop` 那个提前返回
-   * 是为了「上次停在实景、这次打开还是实景」时**不重新解码那张 4K 图**（否则画面会从素底
-   * 闪一下才回实景）。反过来，上次停在素底、这次打开回到实景，就得真的重贴 ——
-   * `background` 的 setter 早把上一张全景 Texture `dispose()` 了。
+   * 是为了「上次停在实景、这次打开还是实景」时**不重新贴一遍**（否则画面会从素底闪一下才回实景）。
+   * 反过来，上次停在素底、这次打开回到实景，就得真的重贴 —— `background` 的 setter 早把
+   * 上一张全景 Texture `dispose()` 了（图本身还在 `panoramaBitmap()` 的缓存里，不用重新下载）。
+   *
+   * 实景那一路自己读字节流、自己解码，就是为了这段过程**有进度可报**。
    */
   useEffect(() => {
     if (!open) return;
@@ -416,18 +474,39 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
     let cancelled = false;
     void ensurePeekViewer(canvasRef.current).then((viewer) => {
       if (cancelled || !viewer) return;
-      // 素底先垫上（两种背景都要）：全景是异步来的，别让人对着黑屏等一张 4K 图
+      // 素底先垫上（两种背景都要）：全景是异步来的，别让人对着黑屏等
       const solid = solidBackdrop();
       if (solid) viewer.background = solid;
-      if (backdrop === 'panorama') {
-        peekBackdrop = 'panorama';
-        void viewer.loadPanorama(SKIN_PANORAMA).catch(() => {
-          // 取不回来（404 / 断网 / 解码失败）就一直素底：人物照旧能转着看，不至于整块坏掉
-          peekBackdrop = 'solid';
-        });
-      } else {
+      if (backdrop !== 'panorama') {
         peekBackdrop = 'solid';
+        setProgress(null);
+        return;
       }
+      /*
+       * 实景：自己读字节流（`panoramaBitmap()`），因为要报进度 —— 库的 `loadPanorama(url)`
+       * 内部是 `loadImage`，一个回调都没有。解码好之后把 bitmap 交回去，那一步是同步的。
+       * `peekBackdrop` 等**真贴成了**才置位，中途失败时它正好代表「现在其实是素底」。
+       */
+      setProgress({phase: 'download', loaded: 0, total: null, ratio: null});
+      void panoramaBitmap(SKIN_PANORAMA, (next) => {
+        if (!cancelled) setProgress(next);
+      })
+        .then((bitmap) => {
+          // 已经切走/关掉了就别贴了 —— 贴上去是同步的，一闪而过，但没必要
+          if (cancelled) return;
+          return viewer.loadPanorama(bitmap);
+        })
+        .then(
+          () => {
+            peekBackdrop = 'panorama';
+            if (!cancelled) setProgress(null);
+          },
+          () => {
+            // 取不回来（404 / 断网 / 解码失败）就一直素底：人物照旧能转着看，不至于整块坏掉
+            peekBackdrop = 'solid';
+            if (!cancelled) setProgress(null);
+          },
+        );
     });
     return () => {
       cancelled = true;
@@ -499,6 +578,19 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
     };
     handle = window.requestAnimationFrame(loop);
     return () => window.cancelAnimationFrame(handle);
+  }, [open]);
+
+  /**
+   * 弹窗盖着的这段时间，网格那边不用再画了。
+   *
+   * 弹窗浮在上面，网格那十几张卡片一张都看不见了，可它们的 `IntersectionObserver` 仍然
+   * 认为自己在视口里，那张 24fps 的循环会照跑 —— 两块 WebGL 上下文同时出图，白烧。
+   * 打开就停、关掉立刻接着画（`suspendStage`/`resumeStage` 的注释里有实测）。
+   */
+  useEffect(() => {
+    if (!open) return;
+    suspendStage();
+    return () => resumeStage();
   }, [open]);
 
   /** Esc 关闭 + 打开期间锁住页面滚动（弹窗里的滚轮是缩放，不该再带动页面）。 */
@@ -575,6 +667,8 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
           />
           {failed ? (
             <p className={styles.failed}>这台设备开不了 WebGL，皮肤转不出来。</p>
+          ) : progress ? (
+            <LoadingBar progress={progress} />
           ) : (
             <p className={styles.hint} aria-hidden="true">
               拖拽旋转 · 滚轮缩放

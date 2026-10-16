@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState, type ReactNode} from 'react';
 import clsx from 'clsx';
 
-import {SKIN_PANORAMA, solidBackdrop, type SkinBackdrop} from '../skinBackdrop';
+import {SKIN_PANORAMA_GRID, panoramaBitmap, solidBackdrop, type SkinBackdrop} from '../skinBackdrop';
 import {applyDefaultPose} from '../skinPose';
 import styles from './styles.module.css';
 
@@ -72,9 +72,18 @@ import styles from './styles.module.css';
  * 轮廓像素平均 1.34:1、86.6% 低于 1.6:1，人就是一坨白（`verify/_probe-skin-legibility.cjs`）。
  * 中间那版「量皮肤明暗、浅皮肤压深底」还是**在两种纯色之间挑**，黑白相间的皮肤两边都分不掉。
  * 现在改成把人物放进 Minecraft 实景：舞台建好就把一张 equirectangular 全景
- * （`SKIN_PANORAMA`）贴到 `scene.background` 上，明暗层次是图里本来就有的。
+ * （`SKIN_PANORAMA_GRID`）贴到 `scene.background` 上，明暗层次是图里本来就有的。
  * 背景的两件事与素底色写在 `components/skinBackdrop.ts`；全景到位之前、以及取不回来时
  * 压一块跟主题走的素底，别黑屏。
+ *
+ * 这里贴的是**卡片那一档**（2048×1024），弹窗贴完整那档（4096×2048）—— 卡片只看得到约 47°
+ * 的水平视野，整张 4K 有八成多的像素永远进不了画面。两档的对比与实测见
+ * `components/skinBackdrop.ts` 文件头那张表。
+ *
+ * ## 弹窗盖上来时把这条循环停掉
+ *
+ * 见下面 `suspendStage()`：弹窗是另一块画布、另一个上下文，而它一盖上这些卡片就都看不见了，
+ * 可 `IntersectionObserver` 仍然认为它们在视口里，循环照跑 —— 两块一起出图，纯属白烧。
  */
 
 /** 卡片的四个状态，落在 `data-mode` 上（验收断言读的就是它）。
@@ -114,8 +123,10 @@ type StageViewer = {
   /** 场景背景。全景贴上去之后是库建的 Texture，素底是一块 Color —— 两种都不必把 three 的
    *  类型图拉进站点的 typecheck，写进来的一律是 `string`（库的 setter 收 `ColorRepresentation`）。 */
   background: unknown;
-  /** 贴 equirectangular 全景。**传 URL 时是异步的**（库里先 `loadImage` 再建 Texture）。 */
-  loadPanorama: (source: string) => Promise<void>;
+  /** 贴 equirectangular 全景。**传 URL 时是异步的**（库里先 `loadImage` 再建 Texture）；
+   *  传 `ImageBitmap` 则是同步的（返回 `void`）—— 我们走后者，解码这一步留在
+   *  `panoramaBitmap()` 里，好在那之前插一段可测量的下载进度（见 `components/skinBackdrop.ts`）。 */
+  loadPanorama: (source: string | ImageBitmap) => void | Promise<void>;
   dispose: () => void;
 };
 
@@ -175,6 +186,9 @@ const skinImages = new Map<string, SkinEntry>();
 let stage: Stage | null = null;
 let stagePromise: Promise<Stage | null> | null = null;
 let stageFailed = false;
+let suspendCards = false;
+/** 已经画过多少帧。挂在舞台画布的 `data-skin-frames` 上，见 `suspendStage()`。 */
+let paintedFrames = 0;
 let frameHandle = 0;
 let lastPaint = 0;
 let dirty = true;
@@ -339,14 +353,15 @@ function markDirty(): void {
 function pump(): void {
   if (frameHandle !== 0 || !stage) return;
   if (typeof document === 'undefined' || document.hidden) return;
+  if (suspendCards) return;
   if (!hasVisible()) return;
   frameHandle = window.requestAnimationFrame(tick);
 }
 
 function tick(now: number): void {
   frameHandle = 0;
-  // 没有可见卡片 / 标签页在后台 / 舞台还没建好：循环到此为止，等下一次 pump 再起来
-  if (typeof document === 'undefined' || document.hidden || !hasVisible() || !stage) return;
+  // 没有可见卡片 / 标签页在后台 / 舞台还没建好 / 弹窗正盖着：循环到此为止，等下一次 pump 再起来
+  if (typeof document === 'undefined' || document.hidden || suspendCards || !hasVisible() || !stage) return;
 
   if (prefersReducedMotion()) {
     // 静态站姿下画面本来就是静的，只在「真有变化」时重画一次，不用一直跑
@@ -355,6 +370,35 @@ function tick(now: number): void {
   }
   if (now - lastPaint >= FRAME_INTERVAL) paint(now);
   frameHandle = window.requestAnimationFrame(tick);
+}
+
+/**
+ * 弹窗打开时把网格的渲染停掉，关上再放行。
+ *
+ * 弹窗是**另一块画布、另一个 WebGL 上下文**，而它一盖上，网格那十几张卡片就没一块看得见了 ——
+ * 但 `IntersectionObserver` 仍然认为它们在视口里（弹窗只是个浮层），那条 24fps 的循环照跑，
+ * 于是两块画布同时出图。
+ *
+ * 停的是**排帧**，不是销毁：卡片画布保留最后一帧（本来就是滚出视口时的行为），
+ * 弹窗一关 `resumeStage()` 立刻接着画。名字用 `suspend` 而不是 `pause`，
+ * 免得跟 `prefers-reduced-motion` 那条「只出静态站姿」的停法混起来。
+ *
+ * 实测（`verify/_probe-panorama-loading.cjs`）：弹窗开着 1.2s，`data-skin-frames` 差 **0**；
+ * 关掉之后 1.2s 差 **27~30**（≈24fps，正是这条循环的节流上限）。
+ */
+export function suspendStage(): void {
+  if (suspendCards) return;
+  suspendCards = true;
+  // 给验收看的。⚠️ 这一条只说明「打算停」；真要证明**停了**，得看 `data-skin-frames`
+  // 还涨不涨（那个数在 `paint()` 里加）。
+  stage?.viewer.canvas.setAttribute('data-skin-suspended', 'on');
+}
+
+export function resumeStage(): void {
+  if (!suspendCards) return;
+  suspendCards = false;
+  stage?.viewer.canvas.removeAttribute('data-skin-suspended');
+  markDirty();
 }
 
 /** 把当前可见的卡片重画一遍 —— 舞台渲染 + blit。 */
@@ -414,6 +458,10 @@ function paint(now: number): void {
   current.viewer.canvas.dataset.skinFov = current.viewer.fov.toFixed(1);
   const {x, y, z} = current.viewer.camera.position;
   current.viewer.canvas.dataset.skinCam = `${x.toFixed(2)},${y.toFixed(2)},${z.toFixed(2)}`;
+  // 帧计数：**只给验收用**。「弹窗打开期间网格真的停了」这件事，得靠「这个数不再涨」来证明 ——
+  // 光看 `data-skin-suspended` 只能证明我们**打算**停（见 `suspendStage`）。
+  paintedFrames += 1;
+  current.viewer.canvas.dataset.skinFrames = String(paintedFrames);
 
   // 同一张皮肤只渲染一次，再一次 drawImage 给这一组里每张卡片
   const groups = new Map<string, Card[]>();
@@ -470,6 +518,8 @@ function ensureStage(): Promise<Stage | null> {
       const skinview3d = await import('skinview3d');
       const canvas = document.createElement('canvas');
       canvas.dataset.skinStage = '';
+      // 用的是哪一档全景，挂出来给验收读（卡片这档必须比弹窗那档小，见 `skinBackdrop.ts`）
+      canvas.dataset.skinPanorama = SKIN_PANORAMA_GRID;
       stageHost().appendChild(canvas);
       const viewer: StageViewer = new skinview3d.SkinViewer({
         canvas,
@@ -502,23 +552,29 @@ function ensureStage(): Promise<Stage | null> {
         solid: null,
       };
       stage = record;
-      // 素底先顶上：全景是异步来的（还得解码一张 4K 图），中间这几百毫秒不能是一块黑屏
+      // 素底先顶上：全景是异步来的（还得先把图解码出来），中间这几百毫秒不能是一块黑屏
       canvas.dataset.skinBackdrop = 'solid';
       applySolid(record);
       /*
        * 实景。取不回来（404 / 断网 / 解码失败）就**一直是素底** —— 一张背景图不该把整块舞台弄坏，
        * 人物照旧能看。两种结果都落在 `data-skin-backdrop` 上，验收读它。
+       *
+       * 贴的是**卡片那一档**（`SKIN_PANORAMA_GRID`，2048×1024）：卡片只看得到约 47° 的水平视野，
+       * 整张 4K 有八成多的像素永远进不了画面，却要陪着一块解码、上传、生成 mipmap。
+       * 降这一档的实测（拍图看观感 + 数合成帧率）见 `components/skinBackdrop.ts` 文件头那张表。
        */
-      void viewer.loadPanorama(SKIN_PANORAMA).then(
-        () => {
-          record.backdrop = 'panorama';
-          canvas.dataset.skinBackdrop = 'panorama';
-          markDirty();
-        },
-        () => {
-          canvas.dataset.skinBackdrop = 'solid';
-        },
-      );
+      void panoramaBitmap(SKIN_PANORAMA_GRID)
+        .then((bitmap) => viewer.loadPanorama(bitmap))
+        .then(
+          () => {
+            record.backdrop = 'panorama';
+            canvas.dataset.skinBackdrop = 'panorama';
+            markDirty();
+          },
+          () => {
+            canvas.dataset.skinBackdrop = 'solid';
+          },
+        );
       return record;
     } catch {
       // 没有 GPU、上下文没批下来……所有卡片停在 2D 头像上，不再重试
