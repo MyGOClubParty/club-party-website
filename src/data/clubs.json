@@ -103,12 +103,9 @@
       "project": "展示项目待定",
       "summary": "活动协办方。参与社团展示区域与互动项目设计，协办本次校园联谊二课活动并共同开展活动宣传。",
       "tags": ["文学", "展示区域"],
-      "logo": "/img/clubs/xuanyuan-literature/logo.svg",
-      "cover": "/img/clubs/xuanyuan-literature/cover.svg",
-      "images": [
-        "/img/clubs/xuanyuan-literature/shot-1.svg",
-        "/img/clubs/xuanyuan-literature/shot-2.svg"
-      ],
+      "logo": "/img/clubs/xuanyuan-literature/logo.png",
+      "cover": "/img/clubs/xuanyuan-literature/shot-1.jpg",
+      "images": ["/img/clubs/xuanyuan-literature/shot-1.jpg"],
       "doc": "/docs/clubs/xuanyuan-literature"
     },
     {
