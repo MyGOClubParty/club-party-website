@@ -49,7 +49,7 @@
  * `pixelStorei(UNPACK_FLIP_Y_WEBGL, texture.flipY)`（0.156.1 里是无条件的，见
  * `three/build/three.module.js:24256`），而 `Texture.flipY` 默认 `true`。可 WebGL 规范给
  * `ImageBitmap` 单开了一条：**源是 ImageBitmap 时 `UNPACK_FLIP_Y_WEBGL` 被忽略**，
- * 改用它自己的 `imageOrientation`。于是 that 那句 `pixelStorei` 对 bitmap 白设，
+ * 改用它自己的 `imageOrientation`。于是那句 `pixelStorei` 对 bitmap 是白设的，
  * 图就这么上下颠倒地被贴上了 —— 而 `<img>` 那条路一直靠它翻正。
  *
  * 实测（`verify/_probe-flipy.cjs`：造一张「上红下蓝」的图，三种源各上传一次再读屏幕上下沿）：
