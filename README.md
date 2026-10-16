@@ -420,7 +420,7 @@ Docusaurus 的 admonition 由 `remark-directive` 解析，容器指令只接受 
 「新功能 / 老功能更新 / 接口与数据变化」，不在「改了一句文案」。
 
 **改 `title`、改一句站内文字、调一个配色值** → 启动 `npm run cf:dev` 看一眼就够了。
-那 250 项里没有一项会因为 `title` 变了而变红，跑一遍只是花三分钟确认「没坏」。
+那 251 项里没有一项会因为 `title` 变了而变红，跑一遍只是花三分钟确认「没坏」。
 
 ### 分层
 
@@ -440,7 +440,7 @@ Docusaurus 的 admonition 由 `remark-directive` 解析，容器指令只接受 
 
 | 套件 | 管什么 | 耗时 | 跑在哪 |
 |---|---|---|---|
-| `verify/site-check.cjs` | 页面渲染、交互、动效、接口串联 | 174s（250 项） | **宿主机**（要 Chrome） |
+| `verify/site-check.cjs` | 页面渲染、交互、动效、接口串联 | 161s（251 项） | **宿主机**（要 Chrome） |
 | `verify/api-check.cjs` | Worker 接口的边界与隐私口径 | 5s（38 项） | 宿主机或容器 |
 | `verify/turnstile-check.cjs` | 人机校验的五条（会自起一个 3099 的失败密钥实例） | 5s（5 项） | **容器内**（用仓库里的 wrangler） |
 | `npm run cf:dry-run` | 部署配置能不能打包 | 3s | 容器内 |

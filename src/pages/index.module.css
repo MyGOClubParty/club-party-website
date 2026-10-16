@@ -57,7 +57,22 @@
 
   position: relative;
   isolation: isolate;
+  /*
+   * 装饰层比视口宽（一层土体 COLUMNS × UNIT = 2560px），所以要裁 —— 但**必须裁成 `clip`，
+   * 不能只写 `hidden`**。`overflow: hidden` 的元素**仍然是一个滚动容器**（只是用户手势
+   * 滚不动它）：`scrollIntoView()` 能把整块 hero 横向滚走，而 `window.scrollTo(0, 0)`
+   * 复位的是文档、复位不了它。
+   *
+   * 2026-10-16 读者看到的「首页的夜晚」配图整体偏左 192px 就是这么来的：拍摄脚本对每个
+   * 元素调 `scrollIntoView({inline: 'start'})`，把它的左边缘顶到本元素的左边缘（单独复现
+   * 一步就是 86px，整段拍完停在最后一次调用的结果上）。浅色那张是在这之前拍的，所以是正的
+   * —— 这正是「只有黑夜那张偏」的原因。
+   *
+   * `overflow: clip` 不创建滚动容器，程序化滚动也滚不动。前一行 `hidden` 是给不认识
+   * `clip` 的老浏览器的兜底，视觉结果一致。验证：verify/_probe-hero-center.cjs。
+   */
   overflow: hidden;
+  overflow: clip;
   display: flex;
   flex-direction: column;
   /* 正文在「留出山峦之后剩下的那块」里竖直居中：视口越高，天空越开阔，
