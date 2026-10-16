@@ -62,8 +62,9 @@
   overflow-wrap: anywhere;
 }
 
-/* 3D 舞台：底纹与卡片里的 3D 区完全一致（石头 + 按主题的罩子 + 斜角），
-   一眼能认出「这就是刚才那格，放大了」。高度跟着视口收，矮屏上不至于把控制区顶出屏幕。 */
+/* 3D 舞台：底纹与卡片里的 3D 区完全一致（石头 + 罩子 + 斜角，罩子最后按皮肤明暗定，
+   见下面那两条），一眼能认出「这就是刚才那格，放大了」。
+   高度跟着视口收，矮屏上不至于把控制区顶出屏幕。 */
 .stage {
   --skin-veil: rgba(250, 251, 252, 0.9);
   position: relative;
@@ -82,6 +83,18 @@
 
 [data-theme='dark'] .stage {
   --skin-veil: rgba(17, 21, 26, 0.88);
+}
+
+/* 衬底按**皮肤**的明暗定，不按主题 —— 与卡片里那两条完全同义（口径、判据、写法都在
+   `components/skinTone.ts` 与 `SkinViewer/styles.module.css`，这里只是把类名换成 `.stage`）。
+   弹窗是「把那格放大」，卡片换了底弹窗不换就等于点开时闪一下另一种底。
+   同样：**必须排在 `[data-theme='dark'] .stage` 之后**，特异度打平、靠源码顺序取胜。 */
+.stage[data-skin-tone='light'] {
+  --skin-veil: rgba(17, 21, 26, 0.88);
+}
+
+.stage[data-skin-tone='dark'] {
+  --skin-veil: rgba(250, 251, 252, 0.9);
 }
 
 /* three 会给画布写死 px 的 style.width/height，所以这里用绝对定位：

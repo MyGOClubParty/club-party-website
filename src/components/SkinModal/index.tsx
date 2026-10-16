@@ -3,6 +3,7 @@ import {Button, Switch, Tag} from '@iicemeta/minecraft-react-ui';
 
 import {applyDefaultPose} from '../skinPose';
 import {skinBadge, type SkinSource} from '../skinSource';
+import {skinToneOf, type SkinTone} from '../skinTone';
 import styles from './styles.module.css';
 
 /**
@@ -34,6 +35,13 @@ import styles from './styles.module.css';
  * 就是为了别让卡片和弹窗各摆各的、点开时画面跳一下。
  * **「重置视角」回的就是这一处** —— 库的 `resetCameraPose()` 摆的是**库默认**的正面
  * （fov 50 / 距离 43.82），早就不是这里的默认了，所以改成调自己的 `applyDefaultPose()`。
+ *
+ * ## 衬底跟着皮肤走，不跟主题走
+ *
+ * `.stage` 上挂着 `data-skin-tone`：浅色皮肤压深底、深色皮肤压浅底（口径与判据在
+ * `components/skinTone.ts`）。这件事必须由弹窗一起做 —— 它是「把那格放大」，
+ * 卡片换了底而弹窗没换，点开就闪一下另一种底。属性挂在 `.stage` 上而不是画布上：
+ * 画布是 three 的地盘（它会给画布写死 px 尺寸与像素比），底纹归 CSS。
  *
  * ## 那些 `data-skin-modal-*` 属性
  *
@@ -266,6 +274,14 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
   const [paused, setPaused] = useState(false);
   const [autoRotate, setAutoRotate] = useState(false);
   const [failed, setFailed] = useState(false);
+  /**
+   * 衬底跟着**皮肤**的明暗走（口径与判据见 `components/skinTone.ts`）——
+   * 卡片和弹窗必须是同一块底，不然点开会闪一下另一种。
+   *
+   * 量好的结果按地址全站缓存，网格那边通常早就量过了，这里同步就能拿到；
+   * 真没量过（这个地址没进过任何一张卡片）就取一次图，量完再改底。
+   */
+  const [tone, setTone] = useState<SkinTone>('mid');
 
   const close = useCallback(() => onClose(), [onClose]);
 
@@ -359,6 +375,22 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
     });
     return () => {
       cancelled = true;
+    };
+  }, [open, skinUrl]);
+
+  /** 衬底：换人时跟着换（同 `[open, skinUrl]` 那个 effect，各管各的）。 */
+  useEffect(() => {
+    if (!open || !skinUrl) return;
+    // 拿得到就同步用；拿不到先落回 `mid`（跟主题走），别留着**上一个人**的底。
+    // `live` 是必须的：这张图量完的回调是异步的，中间可能已经换过人了 ——
+    // 让晚到的结果去改新那个人的底，就会停在前一个人的颜色上。
+    let live = true;
+    const known = skinToneOf(skinUrl, (measured) => {
+      if (live) setTone(measured);
+    });
+    setTone(known ?? 'mid');
+    return () => {
+      live = false;
     };
   }, [open, skinUrl]);
 
@@ -490,7 +522,7 @@ export default function SkinModal({person, onClose}: SkinModalProps): ReactNode 
           </Button>
         </div>
 
-        <div className={styles.stage} data-skin-modal-stage="">
+        <div className={styles.stage} data-skin-modal-stage="" data-skin-tone={tone}>
           <canvas
             ref={canvasRef}
             className={styles.canvas}

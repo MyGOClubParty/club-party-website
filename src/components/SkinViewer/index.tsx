@@ -2,6 +2,7 @@ import {useEffect, useRef, useState, type ReactNode} from 'react';
 import clsx from 'clsx';
 
 import {applyDefaultPose} from '../skinPose';
+import {measureSkinTone, rememberSkinTone, skinToneOf, type SkinTone} from '../skinTone';
 import styles from './styles.module.css';
 
 /**
@@ -64,6 +65,14 @@ import styles from './styles.module.css';
  * 画布像素，等于被放大 1.5 倍显示 —— 就是用户看到的「很模糊」。所以这里只做两端夹取：
  * 不低于 1（等于显示密度，不放大），不高于 3（封顶填充率）。舞台再抬一档到至少 2，
  * 让 dpr=1 的屏幕也能靠缩采样拿到干净的边缘。
+ *
+ * ## 衬底按**皮肤**的明暗选，不按主题（2026-10-16）
+ *
+ * 面板原本只跟主题走：浅色主题压一层白罩子。可皮肤和主题没关系 —— 浅色皮肤坐在浅底上实测
+ * 轮廓像素平均 1.34:1、86.6% 低于 1.6:1，人就是一坨白（`verify/_probe-skin-legibility.cjs`）。
+ * 现在每张皮肤量一次明暗（口径与判据写在 `components/skinTone.ts`），结果落在 `.viewer` 的
+ * `data-skin-tone` 上，压哪块底交给 CSS。**量的时机在皮肤图到手那一刻**（下面 `requestSkin`
+ * 的 load 分支），所以第一帧的底就是对的：不会先按主题的底画、图到了再翻一下。
  */
 
 /** 卡片的四个状态，落在 `data-mode` 上（验收断言读的就是它）。
@@ -277,6 +286,9 @@ function requestSkin(
     image.addEventListener('load', () => {
       record.state = 'ready';
       record.image = image;
+      // 顺手把这身皮肤的明暗量一次（见文件头「衬底按皮肤明暗选」）：图就在手里，
+      // 在这一步量既省掉一次重复取图，也让卡片第一帧就压在正确的底上。
+      rememberSkinTone(skin, measureSkinTone(image));
       const waiters = record.waiters.splice(0, record.waiters.length);
       for (const waiter of waiters) waiter(image);
       markDirty();
@@ -566,6 +578,12 @@ export default function SkinViewer({skin, label, className}: SkinViewerProps): R
   const hostRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mode, setMode] = useState<CardMode>('pending');
+  /**
+   * 这身皮肤的明暗 → 压哪块底（见文件头）。`null` = 还没量出来，按 `mid` 渲染 ——
+   * 也就是「跟着主题走」，和这个功能之前的行为一样，所以量不出来（没有 WebGL、
+   * 图取不回来）时卡片也不会变成一坨怪东西。
+   */
+  const [tone, setTone] = useState<SkinTone | null>(null);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -648,6 +666,9 @@ export default function SkinViewer({skin, label, className}: SkinViewerProps): R
 
     // 先把皮肤取回来，进视口时才有东西可画（同 URL 只取一次）
     requestSkin(skin);
+    // 衬底：同上，量过就直接用，没量过就等 `requestSkin` 的 load 分支把结果记进来（同 URL 只量一次）
+    const knownTone = skinToneOf(skin, setTone);
+    if (knownTone) setTone(knownTone);
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -688,6 +709,7 @@ export default function SkinViewer({skin, label, className}: SkinViewerProps): R
       ref={hostRef}
       className={clsx(styles.viewer, className)}
       data-mode={mode}
+      data-skin-tone={tone ?? 'mid'}
       data-skin-viewer={skin}
       role="img"
       aria-label={label}
