@@ -1,7 +1,12 @@
-import {useCallback, useEffect, useState, type FormEvent, type ReactNode} from 'react';
+import {useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode} from 'react';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 
+import {
+  TURNSTILE_ACTION_ADMIN,
+  loadTurnstileScript,
+  turnstileSitekey,
+} from '@site/src/components/turnstile';
 import styles from './admin.module.css';
 
 /**
@@ -57,6 +62,79 @@ export default function Admin(): ReactNode {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  /** 人机校验 widget 的状态。`loading` 时允许提交（取不到票服务端会明说），`error` 时禁掉按钮。 */
+  const [gateState, setGateState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [gateError, setGateError] = useState('');
+  const gateBox = useRef<HTMLDivElement | null>(null);
+  const gateWidget = useRef<string | null>(null);
+
+  /** 票是一次性的：每次尝试之后都要重新出一张，否则第二次拿到的是「已过期」而不是「口令不对」。 */
+  const resetGate = () => {
+    if (gateWidget.current && window.turnstile) {
+      window.turnstile.reset(gateWidget.current);
+      setGateState('loading');
+    }
+  };
+
+  /*
+   * 渲染 widget。只在前端跑（`useEffect`），所以 SSR 那一帧输出的是一个空容器 ——
+   * Docusaurus 会把这一页预渲染成静态 HTML，容器必须在 DOM 里、不能条件渲染掉，
+   * 否则脚本回来时挂不上去。
+   *
+   * 依赖 `state.kind`：容器只出现在未登录那一支，登出之后要重新挂一次。
+   */
+  useEffect(() => {
+    if (state.kind !== 'anonymous') return;
+    const box = gateBox.current;
+    if (!box) return;
+    let disposed = false;
+
+    const sitekey = turnstileSitekey();
+    setGateState('loading');
+    setGateError('');
+
+    loadTurnstileScript()
+      .then(() => {
+        if (disposed || !box.isConnected) return;
+        const api = window.turnstile;
+        if (!api) throw new Error('人机校验脚本加载了但没挂上 API');
+        gateWidget.current = api.render(box, {
+          sitekey,
+          action: TURNSTILE_ACTION_ADMIN,
+          theme: document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light',
+          'refresh-expired': 'auto',
+          'refresh-timeout': 'auto',
+          callback: () => {
+            if (disposed) return;
+            setGateState('ready');
+            setGateError('');
+          },
+          'error-callback': (code: unknown) => {
+            if (disposed) return;
+            setGateState('error');
+            setGateError(code ? `校验没能完成（错误码 ${String(code)}）` : '校验没能完成');
+          },
+          'expired-callback': () => {
+            if (disposed) return;
+            setGateState('loading');
+          },
+        });
+      })
+      .catch((error: unknown) => {
+        if (disposed) return;
+        setGateState('error');
+        setGateError(error instanceof Error ? error.message : '人机校验没能加载');
+      });
+
+    return () => {
+      disposed = true;
+      const api = window.turnstile;
+      if (gateWidget.current && api) {
+        api.remove(gateWidget.current);
+        gateWidget.current = null;
+      }
+    };
+  }, [state.kind]);
 
   const loadRows = useCallback(async (user: string) => {
     const response = await fetch('/api/admin/participants', {
@@ -102,11 +180,16 @@ export default function Admin(): ReactNode {
     if (busy) return;
     setBusy(true);
     setNotice(null);
+    // 票是一次性的：取一次、用一次。用完（不管成不成）都要 reset，见下面两个分支
+    const turnstileToken =
+      gateWidget.current && window.turnstile
+        ? (window.turnstile.getResponse(gateWidget.current) ?? '').trim()
+        : '';
     try {
       const response = await fetch('/api/admin/login', {
         method: 'POST',
         headers: {'content-type': 'application/json'},
-        body: JSON.stringify({password}),
+        body: JSON.stringify({password, turnstileToken}),
       });
       const payload = (await response.json().catch(() => null)) as
         | {ok: true; user: string}
@@ -116,12 +199,15 @@ export default function Admin(): ReactNode {
         setNotice(
           (payload && 'message' in payload && payload.message) || `登录失败（HTTP ${response.status}）`,
         );
+        // 口令错、票过、被限流 —— 这一张票都已经用掉了，不换一张下次一定是「校验已过期」
+        resetGate();
         return;
       }
       setPassword('');
       await loadRows(payload.user);
     } catch {
       setNotice('网络异常，没连上服务器');
+      resetGate();
     } finally {
       setBusy(false);
     }
@@ -168,7 +254,12 @@ export default function Admin(): ReactNode {
                 placeholder="输入你的口令"
                 required
               />
-              <button className={styles.submit} type="submit" disabled={busy || password.length === 0}>
+              <div className={styles.turnstile} ref={gateBox} data-admin-turnstile />
+              {gateState === 'error' ? <p className={styles.warn}>{gateError}</p> : null}
+              <button
+                className={styles.submit}
+                type="submit"
+                disabled={busy || password.length === 0 || gateState === 'error'}>
                 {busy ? '验证中…' : '登录'}
               </button>
               {notice ? (

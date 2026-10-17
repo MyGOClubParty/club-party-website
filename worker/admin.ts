@@ -36,6 +36,7 @@
  */
 
 import {fail, json, methodNotAllowed} from './http';
+import {TURNSTILE_ADMIN_ACTION, verifyTurnstileToken} from './turnstile';
 
 /** 会话有效期：12 小时。活动当天够用，过夜就失效。 */
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -201,19 +202,43 @@ async function login(request: Request, env: Env): Promise<Response> {
     return fail(429, 'too_many_attempts', '尝试太频繁了，请等一分钟再试');
   }
 
-  let body: {password?: unknown};
+  let body: {password?: unknown; turnstileToken?: unknown};
   try {
-    body = (await request.json()) as {password?: unknown};
+    body = (await request.json()) as {password?: unknown; turnstileToken?: unknown};
   } catch {
     return fail(400, 'bad_json', '请求格式不对');
   }
   const password = typeof body.password === 'string' ? body.password : '';
   if (!password) return fail(400, 'password_missing', '请输入口令');
 
+  /*
+   * 人机校验排在校验口令**之前**：它挡的是自动化，而口令比较是最值得保护的那一步
+   * （也最贵 —— 一次尝试要算一遍口令表的摘要）。
+   *
+   * 票是一次性的。前端在**每一次失败后都会 reset widget 重新出票**（见 src/pages/admin.tsx），
+   * 否则用户改完口令再点提交，拿到的是「校验已过期」而不是「口令不对」。
+   */
+  const turnstileToken = typeof body.turnstileToken === 'string' ? body.turnstileToken : '';
+  const human = await verifyTurnstileToken(request, env, turnstileToken, TURNSTILE_ADMIN_ACTION);
+  if (!human.ok) return fail(human.status, human.code, human.message);
+
   const admins = parseAdmins(env.ADMIN_PASSWORDS);
   if (admins.length === 0) {
     // 这不是「口令不对」，是我们没配 —— 必须说清楚，否则维护者会一直以为自己记错了口令
     return fail(503, 'admin_unconfigured', '后台还没有配置口令，请联系维护者');
+  }
+
+  /*
+   * 口令长度服务端**不强制**（这个值是维护者手填的，强制只会让所有人 503，比弱口令更糟），
+   * 但太短要喊一声 —— 这是唯一能在运行时发现「有人把口令设成 123456」的地方。
+   * 只在登录时打，频率很低。
+   */
+  for (const admin of admins) {
+    if (admin.password.length < 8) {
+      console.warn(
+        `[admin] 口令偏短：${admin.name || '(未命名)'} 只有 ${admin.password.length} 位，建议 12 位以上随机串`,
+      );
+    }
   }
 
   const who = await identify(password, admins);

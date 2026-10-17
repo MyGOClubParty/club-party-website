@@ -61,6 +61,12 @@
   outline-offset: 1px;
 }
 
+/* 人机校验 widget 的落点。留出 65px 高：脚本回来之前那块是空的，不留就会在渲染瞬间
+   把下面的按钮顶下去一下（Turnstile 的默认 widget 就是 300×65）。 */
+.turnstile {
+  min-height: 65px;
+}
+
 .submit {
   padding: 0.6rem 1rem;
   font-weight: 600;

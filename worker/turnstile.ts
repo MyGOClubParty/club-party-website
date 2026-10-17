@@ -43,6 +43,15 @@ const VERIFY_TIMEOUT_MS = 10_000;
  */
 export const TURNSTILE_ACTION = 'signup';
 
+/**
+ * 报名后台登录那个 widget 的 action。与 `src/components/turnstile.ts` 的
+ * `TURNSTILE_ACTION_ADMIN` 必须一致。
+ *
+ * 分成两个是**有意的**：报名页的票不该能拿来登后台，反之亦然。票里带着 widget 渲染时
+ * 写进去的 action，服务端这边只能比对 —— 所以两处字符串必须逐字相同。
+ */
+export const TURNSTILE_ADMIN_ACTION = 'admin';
+
 type SiteverifyPayload = {
   success?: boolean;
   hostname?: string;
@@ -132,19 +141,34 @@ export async function verifyTurnstile(
   env: Env,
   form: FormData,
 ): Promise<TurnstileGate> {
+  // widget 会把票写进一个名叫 `cf-turnstile-response` 的隐藏字段，报名页自己拼 FormData 时
+  // 用的也是这个名字 —— 两边必须是同一个（改名字要同时改 signup.tsx）。
+  const raw = form.get('cf-turnstile-response');
+  return verifyTurnstileToken(request, env, typeof raw === 'string' ? raw : '', TURNSTILE_ACTION);
+}
+
+/**
+ * 通用版：票由调用方给，**用途也要指明**。
+ *
+ * 报名后台（`worker/admin.ts`）走这条，传的是 `TURNSTILE_ADMIN_ACTION` —— 一张报名页的票
+ * 不该能拿来登后台。action 是 widget 渲染时写进票里的，服务端只能比对，没法补写。
+ */
+export async function verifyTurnstileToken(
+  request: Request,
+  env: Env,
+  rawToken: string,
+  expectedAction: string,
+): Promise<TurnstileGate> {
   const secret = (env.TURNSTILE_SECRET ?? '').trim();
   if (!secret) {
     return bad(
       503,
       'turnstile_unconfigured',
-      '服务端还没配人机校验密钥，报名接口暂时不可用，请联系工作人员',
+      '服务端还没配人机校验密钥，暂时无法提交，请联系工作人员',
     );
   }
 
-  // widget 会把票写进一个名叫 `cf-turnstile-response` 的隐藏字段，报名页自己拼 FormData 时
-  // 用的也是这个名字 —— 两边必须是同一个（改名字要同时改 signup.tsx）。
-  const raw = form.get('cf-turnstile-response');
-  const token = typeof raw === 'string' ? raw.trim() : '';
+  const token = rawToken.trim();
   if (!token) {
     return bad(403, 'turnstile_missing', '没有拿到人机校验结果，请刷新页面后重新提交');
   }
@@ -175,7 +199,7 @@ export async function verifyTurnstile(
     // action 只在**真的带回来**时才比。官方文档说 widget 设了 action 就会回，但这一条在本地
     // （测试密钥）先验不了；宁可「没带就不比」，也不要因为一个没法事先验证的字段把整场报名
     // 挡在门外。真实密钥下的每次通过都会把它连 hostname 一起打进日志，便于第一次上线后核对。
-    if (action && action !== TURNSTILE_ACTION) {
+    if (action && action !== expectedAction) {
       return bad(403, 'turnstile_mismatch', '人机校验的用途对不上，请刷新页面后重新提交');
     }
     const allowed = (env.TURNSTILE_HOSTNAMES ?? '')
@@ -185,8 +209,8 @@ export async function verifyTurnstile(
     if (allowed.length > 0 && (hostname === null || !allowed.includes(hostname.toLowerCase()))) {
       return bad(403, 'turnstile_mismatch', '人机校验来自非本站域名，请刷新页面后重新提交');
     }
-    // 上线后的第一手证据：真实的 hostname / action 长什么样，看 `wrangler tail` 即可
-    console.log(`[turnstile] pass hostname=${hostname} action=${action}`);
+    // 上线后的第一手证据：真实的 hostname / action 长什么样，看 Observability 即可
+    console.log(`[turnstile] pass action=${action} (expect ${expectedAction}) hostname=${hostname}`);
   }
 
   return {ok: true, testKey, hostname, action};

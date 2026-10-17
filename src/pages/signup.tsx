@@ -14,6 +14,14 @@ import Heading from '@theme/Heading';
 import {Button, Input} from '@iicemeta/minecraft-react-ui';
 
 import {SkinHead} from '@site/src/components/SkinViewer';
+// Turnstile 的加载与 sitekey 判据搬到 `components/turnstile.ts` —— 报名后台用的是同一份。
+// 那份判据（本地换测试 sitekey）**只能有一处**：分叉一次，后台就会在线上永远过不去。
+import {
+  TURNSTILE_ACTION_SIGNUP,
+  loadTurnstileScript,
+  turnstileSitekey,
+  type TurnstileApi,
+} from '@site/src/components/turnstile';
 import {activity} from '@site/src/data/clubs';
 import styles from './signup.module.css';
 
@@ -50,67 +58,8 @@ const TID_RESOLVE_DELAY = 450;
  * 「什么票都认」的测试密钥）—— 那边认的是 `npm run cf:dev` 的 `--var` / `wrangler secret`，
  * 见 worker/turnstile.ts 顶部。两边选的是两样东西，判据不同是故意的。
  */
-const TURNSTILE_SITEKEY = '0x4AAAAAAEmcKHpkdTedZjS9';
-const TURNSTILE_TEST_SITEKEY = '1x00000000000000000000AA';
-/** 与 worker/turnstile.ts 的 `TURNSTILE_ACTION` 必须一致：服务端会拿它比对。 */
-const TURNSTILE_ACTION = 'signup';
-/** 本机预览的判据：localhost、回环、以及 RFC1918 的局域网地址（走 4023 隧道时是这个）。 */
-const LOCAL_HOSTNAMES =
-  /^(localhost|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|0\.0\.0\.0|\[?::1\]?|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})$/;
-
-/** `render=explicit`：widget 什么时候出现、出现在哪儿由我们说了算，不靠它自己扫 DOM。 */
-const TURNSTILE_SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-
-/**
- * 只用得到这几个成员，没必要把官方的类型包拉进来（它也没有 d.ts 发布）。
- *
- * 这里**故意没有 `ready()`**。它不是「等 api.js 就绪」的通用姿势：官方只在
- * 「script 标签不带 async/defer」时才允许调它，否则它当场抛
- * `[Cloudflare Turnstile] Remove async/defer from the Turnstile api.js script tag
- * before using turnstile.ready()` —— widget 一个都不会出现（实测过：容器里
- * childElementCount 恒为 0）。动态插 script 时官方给的姿势是用 script 自己的
- * `onload`，也就是下面 `loadTurnstileScript()` 那个 promise 的 resolve 时机。
- */
-type TurnstileApi = {
-  render: (container: HTMLElement, options: Record<string, unknown>) => string;
-  reset: (widgetId?: string) => void;
-  remove: (widgetId: string) => void;
-  getResponse: (widgetId?: string) => string | undefined;
-};
-
-declare global {
-  interface Window {
-    turnstile?: TurnstileApi;
-  }
-}
-
-/**
- * api.js 只在报名页加载（站里别的页面用不上）。
- *
- * 同一个 promise 复用，避免重复插 `<script>`；失败时把缓存清掉，重挂载（或切主题触发重渲）
- * 还有再来一次的机会。
- *
- * **不要给这张 script 加 `async`/`defer`**：加了 Turnstile 就拒绝 `turnstile.ready()`
- * （见上面 `TurnstileApi` 的说明）。动态插进来的 script 本来就是异步下载、不阻塞解析的，
- * `async = false` 只是把 `async` 属性摘掉（不写这个属性默认就是异步），没有任何代价。
- * 就绪信号用 `onload` —— 它触发时 api.js 已经执行完，`window.turnstile.render` 可以直接用。
- */
-let turnstileScript: Promise<void> | null = null;
-function loadTurnstileScript(): Promise<void> {
-  if (turnstileScript) return turnstileScript;
-  turnstileScript = new Promise<void>((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = TURNSTILE_SCRIPT;
-    script.async = false;
-    script.onload = () => resolve();
-    script.onerror = () => {
-      turnstileScript = null;
-      reject(new Error('人机校验脚本加载失败'));
-    };
-    document.head.appendChild(script);
-  });
-  return turnstileScript;
-}
+// sitekey / 测试 sitekey / api.js 地址 / `TurnstileApi` 类型 / `loadTurnstileScript()`
+// 全部来自 `components/turnstile.ts` —— 报名后台用的是同一份，这里不再重复定义。
 
 /** widget 的三种状态：`loading` 期间允许提交（取不到票会就地提示），`error` 时禁掉按钮。 */
 type TurnstileState = 'loading' | 'ready' | 'error';
@@ -370,9 +319,7 @@ export default function Signup(): ReactNode {
       setTsError(error instanceof Error ? error.message : String(error));
     }
 
-    const sitekey = LOCAL_HOSTNAMES.test(window.location.hostname)
-      ? TURNSTILE_TEST_SITEKEY
-      : TURNSTILE_SITEKEY;
+    const sitekey = turnstileSitekey();
     setTsSitekey(sitekey);
     setTsState('loading');
     setTsError('');
@@ -385,7 +332,7 @@ export default function Signup(): ReactNode {
         try {
           tsWidget.current = api.render(box, {
             sitekey,
-            action: TURNSTILE_ACTION,
+            action: TURNSTILE_ACTION_SIGNUP,
             theme: tsTheme,
             // 票 5 分钟就过期。同学可能边填边想，让它自己换一张，
             // 别等人点了提交才发现票已经废了。

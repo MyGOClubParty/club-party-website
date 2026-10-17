@@ -488,7 +488,13 @@ Disallow** —— 后台不需要被发现。
 - 谁登录过：每次登录都 `console.log('[admin] login ok user=… ip=…')`，Observability 里可查。
 - 导出：CSV 带 BOM（Excel 打开中文不乱码）、TXT 是按全角宽度补齐的文本表格；
   文件名 `participants-YYYYMMDD-HHmm.{csv,txt}`，导出动作同样进日志。
-- 登录接口有 **10 次/60s/IP** 的限流（`ADMIN_LOGIN_LIMIT`）。
+- **登录要过三道闸**，顺序是刻意的：
+  1. **Turnstile**（挡自动化）—— widget 的 action 是 `admin`，与报名页的 `signup` **不能串用**；
+     票是一次性的，前端每次失败都会 `reset()` 重新出票，否则第二次拿到的是「已过期」而不是「口令不对」；
+  2. **10 次/60s/IP**（挡连点，`ADMIN_LOGIN_LIMIT`）；
+  3. **口令摘要比对**（防时序侧信道，循环不提前 break）。
+- 口令长度服务端**不强制**（配置是人填的，强制只会让所有人 503），但短于 8 位会在日志里 warn 一声
+  —— 建议用 12 位以上的随机串。
 
 ### 分享卡片
 
@@ -525,7 +531,7 @@ Docusaurus 的 admonition 由 `remark-directive` 解析，容器指令只接受 
 「新功能 / 老功能更新 / 接口与数据变化」，不在「改了一句文案」。
 
 **改 `title`、改一句站内文字、调一个配色值** → 启动 `npm run cf:dev` 看一眼就够了。
-那 267 项里没有一项会因为 `title` 变了而变红，跑一遍只是花三分钟确认「没坏」。
+那 268 项里没有一项会因为 `title` 变了而变红，跑一遍只是花三分钟确认「没坏」。
 
 ### 分层
 
@@ -545,7 +551,7 @@ Docusaurus 的 admonition 由 `remark-directive` 解析，容器指令只接受 
 
 | 套件 | 管什么 | 耗时 | 跑在哪 |
 |---|---|---|---|
-| `verify/site-check.cjs` | 页面渲染、交互、动效、接口串联 | 167s（267 项） | **宿主机**（要 Chrome） |
+| `verify/site-check.cjs` | 页面渲染、交互、动效、接口串联 | 170s（268 项） | **宿主机**（要 Chrome） |
 | `verify/api-check.cjs` | Worker 接口的边界与隐私口径 | 5s（38 项） | 宿主机或容器 |
 | `verify/turnstile-check.cjs` | 人机校验的五条（会自起一个 3099 的失败密钥实例） | 5s（5 项） | **容器内**（用仓库里的 wrangler） |
 | `npm run cf:dry-run` | 部署配置能不能打包 | 3s | 容器内 |
@@ -573,7 +579,7 @@ BASE=http://192.168.31.79:4023 node verify/site-check.cjs --upto=signup
 167.2s），都不含起停浏览器那部分 —— 两趟连着跑实测一共 5m58s，摊到一趟约 2m59s。
 名单先重置成 20 条，起伏主要来自末段与上游 LittleSkin 往返。名单越长末段越贵 —— 见下一节。
 
-`--upto=roster` 单独跑是 267 项里的 249 项（少掉活动日志那 19 项，而收尾那条「控制台错误为 0」
+`--upto=roster` 单独跑是 268 项里的 250 项（少掉活动日志那 19 项，而收尾那条「控制台错误为 0」
 落进名单段），实测约 2m35s。
 
 **只改「小伙伴们」页或四篇活动日志** → 直接跑全套（段在末尾，`--upto` 省不了）；只改

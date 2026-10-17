@@ -20,7 +20,8 @@
 | 2.4 robots.txt | 补 `static/robots.txt`（`Disallow: /admin` + `Sitemap:`） | 200 |
 | 2.5 `/api/skin-preview` | 边缘缓存（`caches.default`，key 规范化）+ 限流 120/60s/IP | 同一 TID 第二次 **42ms** vs 首次 **461ms** |
 | 2.6 observability | 写进 `wrangler.jsonc`（仪表盘开的同时代码里也要有） | `cf:dry-run` 通过 |
-| 2.7 管理后台 | 新增 `/admin`：登录、看完整名单、导出 CSV / TXT | `api-check` **40/40**；401 / 200 / 退出后 401 都实测过 |
+| 2.7 管理后台 | 新增 `/admin`：登录、看完整名单、导出 CSV / TXT | `api-check` **43/43**；401 / 200 / 退出后 401 都实测过 |
+| 2.8 登录防爆破 | 登录加 **Turnstile**（action=`admin`，与报名页的票不能串用）+ 10/60s/IP 限流 + 摘要比对；票一次性，失败即 `reset()` 重出票 | 无票 → `403 turnstile_missing`；有票错口令 → `401 bad_password`；有票对口令 → 200。`api-check` 为此加了 3 条 |
 | 3.1 分页 | `/api/participants?limit=&offset=`，前端每页 24；新增 `total` / `hasMore` | 接口断言 2 条 + 套件里 1 条 |
 | 3.4 死代码 | 删 `HomepageFeatures/` 与 3 个 `undraw_docusaurus_*.svg`、`docusaurus.png` | 产物少 84.5 KB |
 | 3.6 hostname | `TURNSTILE_HOSTNAMES` 填 `clubparty.iicemeta.com`（测试密钥下自动跳过） | 本地仍可报名 |
@@ -40,8 +41,18 @@
   **多管理员请用第一种**：后两种只有口令、没有名字，日志里只会出现 `admin-3f9a1c2e` 这种摘要。
 - 会话是**签名 cookie**（`HttpOnly; SameSite=Strict; Secure`，12 小时），服务端零状态 ——
   不写库、不建表；密钥由 `ADMIN_PASSWORDS` 派生，所以**改口令 = 所有人立刻重新登录**。
-- 「谁登录过」：每次登录都 `console.log('[admin] login ok user=… ip=…')`，Observability 里可查；
+- 谁登录过：每次登录都 `console.log('[admin] login ok user=… ip=…')`，Observability 里可查；
   后台页面顶部也直接写着当前登录者。
+- **登录的三道闸**（顺序是刻意的，不要调换）：
+  1. **Turnstile** —— 挡自动化。widget 的 action 是 `admin`，与报名页的 `signup` **不能串用**
+     （服务端会比对票里带的 action）。票**一次性**，前端每次失败都 `reset()` 重出票，
+     否则用户改完口令再点提交，拿到的是「校验已过期」而不是「口令不对」。
+     没配 `TURNSTILE_SECRET` 时后台登录会 503 —— 与报名接口同一条规矩，不静默放过。
+  2. **10 次/60s/IP**（`ADMIN_LOGIN_LIMIT`）—— 挡连点。单 IP 有上限，但**分布式爆破它挡不住**，
+     所以第 1 道才是主力。
+  3. **口令摘要比对** —— SHA-256 上比，循环不提前 break，防时序侧信道。
+- 口令长度服务端**不强制**（配置是人填的，强制只会让所有人 503），但短于 8 位会在登录时打一条
+  `warn`，建议 12 位以上随机串。
 - 导出：`?format=csv`（带 BOM，Excel 不乱码）/ `?format=txt`（按全角宽度对齐的文本表格），
   文件名 `participants-YYYYMMDD-HHmm.{csv,txt}`，导出动作同样进日志。
 
