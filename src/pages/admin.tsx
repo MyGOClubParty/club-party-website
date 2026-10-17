@@ -90,6 +90,12 @@ export default function Admin(): ReactNode {
   const [editError, setEditError] = useState<string | null>(null);
   /** 保存成功后的回执（比如「改了 college、qq」），与登录失败那类警告分开。 */
   const [saved, setSaved] = useState<string | null>(null);
+  /** 正在确认删除的那一行（学号）；null = 没有在删。 */
+  const [deleting, setDeleting] = useState<string | null>(null);
+  /** 确认框里手输的学号 —— 与服务端那次校验一起构成「两道确认」。 */
+  const [confirmText, setConfirmText] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   /** 人机校验 widget 的状态。`loading` 时允许提交（取不到票服务端会明说），`error` 时禁掉按钮。 */
   const [gateState, setGateState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [gateError, setGateError] = useState('');
@@ -241,6 +247,50 @@ export default function Admin(): ReactNode {
     }
   };
 
+  const startDelete = (row: AdminRow) => {
+    // 编辑与删除互斥：同一行同时摊开两张表单，容易点错
+    setEditing(null);
+    setDeleting(row.studentId);
+    setConfirmText('');
+    setDeleteError(null);
+    setSaved(null);
+  };
+
+  const confirmDelete = async (row: AdminRow) => {
+    // 前端这道只是体验：真正的兜底在服务端（body 里学号要写两遍且一致）
+    if (deleteBusy || confirmText !== row.studentId) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const response = await fetch('/api/admin/participants', {
+        method: 'DELETE',
+        headers: {'content-type': 'application/json'},
+        body: JSON.stringify({studentId: row.studentId, confirmStudentId: confirmText}),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {ok: true; studentId: string; skinDeleted: boolean}
+        | {ok: false; message?: string}
+        | null;
+      if (!response.ok || !payload || !payload.ok) {
+        setDeleteError(
+          (payload && 'message' in payload && payload.message) || `删除失败（HTTP ${response.status}）`,
+        );
+        return;
+      }
+      setDeleting(null);
+      setConfirmText('');
+      setSaved(
+        `已删除 ${row.mcId}（${row.studentId}）` +
+          (payload.skinDeleted ? '，皮肤文件一并删掉了' : ''),
+      );
+      if (state.kind === 'ready') await loadRows(state.user);
+    } catch {
+      setDeleteError('网络异常，没删成');
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   const signOut = async () => {
     await fetch('/api/admin/logout', {method: 'POST'}).catch(() => undefined);
     setState({kind: 'anonymous'});
@@ -249,6 +299,8 @@ export default function Admin(): ReactNode {
 
   /** 把这一行摊开成表单。改的是副本，点「保存」之前不碰服务端。 */
   const startEdit = (row: AdminRow) => {
+    // 编辑与删除互斥，见 startDelete
+    setDeleting(null);
     setEditing(row.studentId);
     setDraft({
       studentId: row.studentId,
@@ -420,16 +472,28 @@ export default function Admin(): ReactNode {
                             <td className={styles.dim}>{sourceLabel(row)}</td>
                             <td className={styles.dim}>{row.registeredAt}</td>
                             <td>
-                              <button
-                                type="button"
-                                className={styles.editButton}
-                                data-admin-edit={row.studentId}
-                                aria-expanded={editing === row.studentId}
-                                onClick={() =>
-                                  editing === row.studentId ? setEditing(null) : startEdit(row)
-                                }>
-                                {editing === row.studentId ? '收起' : '编辑'}
-                              </button>
+                              <div className={styles.rowActions}>
+                                <button
+                                  type="button"
+                                  className={styles.editButton}
+                                  data-admin-edit={row.studentId}
+                                  aria-expanded={editing === row.studentId}
+                                  onClick={() =>
+                                    editing === row.studentId ? setEditing(null) : startEdit(row)
+                                  }>
+                                  {editing === row.studentId ? '收起' : '编辑'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.deleteButton}
+                                  data-admin-delete={row.studentId}
+                                  aria-expanded={deleting === row.studentId}
+                                  onClick={() =>
+                                    deleting === row.studentId ? setDeleting(null) : startDelete(row)
+                                  }>
+                                  {deleting === row.studentId ? '收起' : '删除'}
+                                </button>
+                              </div>
                             </td>
                           </tr>
                           {/* 编辑表单摊在这一行下面，而不是弹窗：改的时候还能看见原值 */}
@@ -479,6 +543,55 @@ export default function Admin(): ReactNode {
                                     <strong>皮肤文件不会跟着改名</strong> —— 想换皮肤请让同学重新报名。
                                   </p>
                                 </form>
+                              </td>
+                            </tr>
+                          ) : null}
+                          {/* 删除确认：写清会删掉什么，并要求把学号再输一遍才点得动 */}
+                          {deleting === row.studentId ? (
+                            <tr className={styles.deleteRow}>
+                              <td colSpan={10}>
+                                <div className={styles.deleteBox} data-admin-delete-form={row.studentId}>
+                                  <p className={styles.deleteWarn}>
+                                    <strong>删了不能撤销。</strong>
+                                    会删除：学号 {row.studentId}（{row.name}）· Minecraft ID {row.mcId}
+                                    {row.skinKey ? ` · 皮肤文件 ${row.skinKey}` : ' · 没有皮肤文件'}
+                                    。同学之后可以重新报名，但皮肤要重新上传。
+                                  </p>
+                                  <label className={styles.editField}>
+                                    <span className={styles.editLabel}>
+                                      把学号再输一遍确认
+                                      <em className={styles.editHint}>输错一个字都点不动</em>
+                                    </span>
+                                    <input
+                                      className={styles.input}
+                                      value={confirmText}
+                                      onChange={(event) => setConfirmText(event.target.value)}
+                                      placeholder={row.studentId}
+                                      inputMode="numeric"
+                                      autoComplete="off"
+                                    />
+                                  </label>
+                                  <div className={styles.editActions}>
+                                    <button
+                                      className={styles.deleteConfirm}
+                                      type="button"
+                                      disabled={deleteBusy || confirmText !== row.studentId}
+                                      onClick={() => void confirmDelete(row)}>
+                                      {deleteBusy ? '删除中…' : '永久删除'}
+                                    </button>
+                                    <button
+                                      className={styles.actionGhost}
+                                      type="button"
+                                      onClick={() => {
+                                        setDeleting(null);
+                                        setConfirmText('');
+                                        setDeleteError(null);
+                                      }}>
+                                      取消
+                                    </button>
+                                  </div>
+                                  {deleteError ? <p className={styles.warn}>{deleteError}</p> : null}
+                                </div>
                               </td>
                             </tr>
                           ) : null}

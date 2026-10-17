@@ -23,6 +23,7 @@
 | 2.7 管理后台 | 新增 `/admin`：登录、看完整名单、导出 CSV / TXT | `api-check` **43/43**；401 / 200 / 退出后 401 都实测过 |
 | 2.8 登录防爆破 | 登录加 **Turnstile**（action=`admin`，与报名页的票不能串用）+ 10/60s/IP 限流 + 摘要比对；票一次性，失败即 `reset()` 重出票 | 无票 → `403 turnstile_missing`；有票错口令 → `401 bad_password`；有票对口令 → 200。`api-check` 为此加了 3 条 |
 | 2.9 后台编辑 | 表格行内编辑六个字段（学号/姓名/学院/班级/QQ/MCID），`PATCH /api/admin/participants`；校验与报名**同一份**（`worker/fields.ts`）；学号先查重，皮肤不跟着改名 | `api-check` **47/47**（+4：登录、未登录 401、改完公开名单读到新值、非法值 400） |
+| 2.10 后台删除 | 行内删除 + **两道确认**（前端要手输学号才点得动，服务端要求学号写两遍且一致）；先删 D1 再删 R2；被删整行进日志便于恢复 | `api-check` **52/52**（+5：单独造一条记录、未登录 401、确认不符 400 且一条没删、删完名单里消失且 R2 文件一并删除、再删 404） |
 | 3.1 分页 | `/api/participants?limit=&offset=`，前端每页 24；新增 `total` / `hasMore` | 接口断言 2 条 + 套件里 1 条 |
 | 3.4 死代码 | 删 `HomepageFeatures/` 与 3 个 `undraw_docusaurus_*.svg`、`docusaurus.png` | 产物少 84.5 KB |
 | 3.6 hostname | `TURNSTILE_HOSTNAMES` 填 `clubparty.iicemeta.com`（测试密钥下自动跳过） | 本地仍可报名 |

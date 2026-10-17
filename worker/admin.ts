@@ -35,7 +35,7 @@
  * 否则本地根本设不上这个 cookie，测不了。
  */
 
-import {validateRegistration} from './fields';
+import {STUDENT_ID_RE, validateRegistration} from './fields';
 import {fail, json, methodNotAllowed} from './http';
 import {TURNSTILE_ADMIN_ACTION, verifyTurnstileToken} from './turnstile';
 
@@ -558,6 +558,107 @@ async function update(request: Request, env: Env): Promise<Response> {
   return json({ok: true, changed, studentId: next.studentId});
 }
 
+/**
+ * `DELETE /api/admin/participants` —— 删掉一条报名。
+ *
+ * 为什么需要：换皮肤要重新报名（`skin_key` 不跟着改名，见 `update` 那段），而**已经报过名的
+ * 学号重报会撞 UNIQUE**。没有删除这条路，「想换皮肤」就成了一条死胡同。
+ *
+ * ## 两道确认，一道在前端、一道在这儿
+ *
+ * 前端要管理员**把学号再输一遍**（手滑点不到）；服务端还要 `confirmStudentId` 与 `studentId`
+ * 完全一致 —— 前端那层只是体验，真正兜底的是这一层：任何一个能发请求的人，都必须显式把
+ * 「删谁」写两遍。这不是防恶意（能发请求的人已经登录了），是防**手滑与脚本误调**。
+ *
+ * ## 顺序：先删 D1，再删 R2
+ *
+ * 反过来的话，R2 删成功而 D1 失败，会留下一条**指向不存在对象**的记录（页面上一张破图）；
+ * 而这个顺序最坏只会留下一个**孤儿对象**（没有行指向它，占点空间，不影响任何页面）。
+ * 与报名那条路的取舍一致：宁可多一个没人引用的文件，也不要一行坏数据。
+ *
+ * R2 删除失败**不回滚** D1 —— 行已经删了，回滚只会让「删除」变成「删了一半」。
+ * 失败进日志，孤儿对象可以日后手工清。
+ *
+ * ## 误删怎么办
+ *
+ * 完整的那一行会**原样打进日志**（`[admin] delete ... row={...}`），Observability 里翻得到，
+ * 拿它重建一条记录就行。这是不建表能做到的最低成本兜底；再往下就是 D1 的 Time Travel
+ * （整库回滚，动作大得多）。
+ */
+async function remove(request: Request, env: Env): Promise<Response> {
+  const user = await currentUser(request, env);
+  if (!user) return fail(401, 'unauthorized', '请先登录');
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return fail(400, 'bad_json', '请求格式不对');
+  }
+
+  const studentId = typeof body.studentId === 'string' ? body.studentId.trim() : '';
+  const confirmStudentId =
+    typeof body.confirmStudentId === 'string' ? body.confirmStudentId.trim() : '';
+  if (!STUDENT_ID_RE.test(studentId)) {
+    return fail(400, 'bad_target', '没指定要删哪一条（studentId 应该是 10 位学号）');
+  }
+  if (confirmStudentId !== studentId) {
+    // 这一条就是「二次确认」：不匹配不动手，而且说清楚是哪个对不上
+    return fail(
+      400,
+      'confirm_mismatch',
+      '要删除的学号和确认框里填的不一致，没有删除任何东西',
+    );
+  }
+
+  let before: AdminRow | null;
+  try {
+    before = await env.DB.prepare(
+      `SELECT ${COLUMNS.join(', ')} FROM participants WHERE student_id = ?`,
+    )
+      .bind(studentId)
+      .first<AdminRow>();
+  } catch (error) {
+    console.error('[admin] delete read failed', error instanceof Error ? error.message : error);
+    return fail(503, 'db_unavailable', '读不到这条记录，请稍后重试');
+  }
+  if (!before) return fail(404, 'not_found', `没有学号为 ${studentId} 的报名记录`);
+
+  try {
+    const result = await env.DB.prepare('DELETE FROM participants WHERE student_id = ?')
+      .bind(studentId)
+      .run();
+    // 并发下可能已经被别人删掉了（读和删之间有窗口）
+    if (!result.meta?.changes) {
+      return fail(404, 'not_found', `学号 ${studentId} 的记录已经不在了（可能刚被别人删掉）`);
+    }
+  } catch (error) {
+    console.error('[admin] delete failed', error instanceof Error ? error.message : error);
+    return fail(503, 'store_failed', '删除失败，请稍后重试');
+  }
+
+  let skinDeleted = false;
+  if (before.skin_key) {
+    try {
+      await env.SKINS.delete(before.skin_key);
+      skinDeleted = true;
+    } catch (error) {
+      // 行已经删了，这里不再回滚 —— 回滚只会变成「删了一半」。孤儿对象不影响任何页面。
+      console.error(
+        `[admin] r2 delete failed key=${before.skin_key}`,
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
+  // 整行原样进日志：误删之后靠它重建（见函数头「误删怎么办」）
+  console.log(
+    `[admin] delete by=${user} student=${studentId} mcId=${before.mc_id} ` +
+      `skin=${before.skin_key ?? '(none)'} skinDeleted=${skinDeleted} row=${JSON.stringify(before)}`,
+  );
+  return json({ok: true, studentId, skinDeleted});
+}
+
 /** `/api/admin/*` 的入口。 */
 export async function handleAdmin(request: Request, env: Env): Promise<Response> {
   const {pathname} = new URL(request.url);
@@ -565,8 +666,9 @@ export async function handleAdmin(request: Request, env: Env): Promise<Response>
   if (pathname === '/api/admin/logout') return logout(request);
   if (pathname === '/api/admin/session') return whoami(request, env);
   if (pathname === '/api/admin/participants') {
-    // PATCH 改人、GET 读人 —— 同一个资源名，按方法分派
+    // 同一个资源名，按方法分派：GET 读人、PATCH 改人、DELETE 删人
     if (request.method === 'PATCH') return update(request, env);
+    if (request.method === 'DELETE') return remove(request, env);
     return list(request, env);
   }
   return fail(404, 'no_such_endpoint', '没有这个后台接口');

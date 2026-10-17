@@ -258,3 +258,63 @@
   grid-column: 1 / -1;
   margin: 0;
 }
+
+/* ---- 删除 ---- */
+
+.rowActions {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.deleteButton {
+  padding: 0.25rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ifm-color-danger);
+  background: transparent;
+  border: 1px solid var(--ifm-color-danger);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.deleteButton:hover {
+  color: #fff;
+  background: var(--ifm-color-danger);
+}
+
+/* 确认区是一整块淡红：一眼能看出「这一步不是编辑」 */
+.deleteRow td {
+  padding: 0.9rem 0.75rem 1rem;
+  background: var(--ifm-color-danger-contrast-background, rgba(250, 56, 62, 0.08));
+}
+
+.deleteBox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 42rem;
+}
+
+.deleteWarn {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  line-height: 1.75;
+  color: var(--ifm-color-danger-dark);
+  background: var(--ifm-background-color);
+  border-left: 4px solid var(--ifm-color-danger);
+}
+
+.deleteConfirm {
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ifm-color-danger);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.deleteConfirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
