@@ -215,14 +215,22 @@ club-party-website/
 ## 报名与皮肤
 
 报名页 `/signup` 收六项：学号、姓名、学院、班级、QQ、Minecraft 游戏 ID；皮肤是可选项。名单页  
-`/participants` 只读不改。两页都走同一个 Worker 的四条接口：
+`/participants` 只读不改。两页都走同一个 Worker 的接口：
 
 | 接口                  | 方法   | 说明                                       |
 | ------------------- | ---- | ---------------------------------------- |
 | `/api/health`       | GET  | 存活探针，回服务名                                |
 | `/api/register`     | POST | `multipart/form-data`，**必须带人机校验的票**；成功回 201 与提交者本人的回执（含姓名与班级） |
-| `/api/participants` | GET  | 名单，**只下发学院 / MC ID / 有没有皮肤 / 皮肤地址与来源** |
+| `/api/participants` | GET  | 名单，**只下发学院 / MC ID / 有没有皮肤 / 皮肤地址与来源**；支持 `?limit=&offset=`（默认 100、上限 200） |
 | `/api/skins/<key>`  | GET  | 取皮肤 PNG，带 ETag，命中 `If-None-Match` 回 304  |
+| `/api/skin-preview` | GET  | 按 LittleSkin TID 取图（同源代理）：边缘缓存 10 分钟 + **120 次/60s/IP** 限流 |
+| `/api/admin/login`  | POST | 管理员登录，口令在 `ADMIN_PASSWORDS`；成功种一枚签名 cookie（见 `worker/admin.ts`） |
+| `/api/admin/participants` | GET | 完整名单（含学号/姓名/班级/QQ，**必须登录**）；`?format=csv\|txt` 导出 |
+
+名单分页的默认值**刻意不是一页 24 张**：这条接口还有后台导出与外部脚本在用，把默认压小会悄悄改掉
+它们的语义。名单页自己传 `?limit=24&offset=…`（`src/pages/participants.tsx` 的 `PAGE_SIZE`，
+验收里那条「页面卡片数 = 接口 count」会按同一个数去问接口）。响应多给三个字段：`total`（库里一共
+多少人）、`limit`、`offset`、`hasMore`。
 
 `/api/participants` 的 SQL 与 JSON 里都不含学号、QQ、姓名与班级——名单是公开页面，学号只做唯一键用，  
 姓名与班级只在库里存着给活动核对，展示口径是「游戏 ID + 学院」。重复学号会拿到 409。
@@ -468,6 +476,33 @@ texture.flipY)`，`Texture.flipY` 默认 `true`）—— `<img>` 那条路一直
 `ImageBitmap` 翻转对照表）、`_probe-throttle.cjs`（先证明 CDP 限速真的生效 —— 不然「压了网速」  
 只是句空话）。
 
+### 报名后台（`/admin`）
+
+只读的运营工具：登录、看完整名单、导出 CSV / TXT。**不在导航、不在 sitemap、`robots.txt` 也
+Disallow** —— 后台不需要被发现。
+
+- 口令：`wrangler secret put ADMIN_PASSWORDS`，格式 `名字:口令|名字:口令|…`
+  （也认 `a|b|c` 与 `[a,b,c]`，但那两种没有名字，日志里只会出现 `admin-3f9a1c2e` 这种摘要）。
+- 会话：HMAC 签名 cookie（`HttpOnly; SameSite=Strict; Secure`，12 小时），**服务端零状态** ——
+  不建表、不写库；密钥由 `ADMIN_PASSWORDS` 派生，所以**改口令 = 所有人立刻重新登录**。
+- 谁登录过：每次登录都 `console.log('[admin] login ok user=… ip=…')`，Observability 里可查。
+- 导出：CSV 带 BOM（Excel 打开中文不乱码）、TXT 是按全角宽度补齐的文本表格；
+  文件名 `participants-YYYYMMDD-HHmm.{csv,txt}`，导出动作同样进日志。
+- 登录接口有 **10 次/60s/IP** 的限流（`ADMIN_LOGIN_LIMIT`）。
+
+### 分享卡片
+
+`static/img/social-card.png`（1200×630，19.2 KB）由 `scripts/make-social-card.py` 生成：中文用
+**原版 `unifont`**（`码位:十六进制位图` —— 和游戏里显示中文的是同一份），地面与方块用原版贴图。
+贴图一律按**整数倍**放大（3 倍 = 48px、6 倍 = 96px），非整数倍会把像素糊掉。
+
+⚠️ `grass_block_top` 是**灰度贴图**，颜色由生物群系叠加 —— 不乘上草色，地面看起来像铺了水泥
+（第一版就是这么翻车的）。脚本只能在容器里跑（宿主没有 PIL）：
+
+```bash
+python3 scripts/make-social-card.py --assets ../minecraft-assets
+```
+
 ## 编写约定
 
 ### `:::` 的标题必须写在方括号里
@@ -490,7 +525,7 @@ Docusaurus 的 admonition 由 `remark-directive` 解析，容器指令只接受 
 「新功能 / 老功能更新 / 接口与数据变化」，不在「改了一句文案」。
 
 **改 `title`、改一句站内文字、调一个配色值** → 启动 `npm run cf:dev` 看一眼就够了。
-那 266 项里没有一项会因为 `title` 变了而变红，跑一遍只是花三分钟确认「没坏」。
+那 267 项里没有一项会因为 `title` 变了而变红，跑一遍只是花三分钟确认「没坏」。
 
 ### 分层
 
@@ -510,7 +545,7 @@ Docusaurus 的 admonition 由 `remark-directive` 解析，容器指令只接受 
 
 | 套件 | 管什么 | 耗时 | 跑在哪 |
 |---|---|---|---|
-| `verify/site-check.cjs` | 页面渲染、交互、动效、接口串联 | 168s（266 项） | **宿主机**（要 Chrome） |
+| `verify/site-check.cjs` | 页面渲染、交互、动效、接口串联 | 167s（267 项） | **宿主机**（要 Chrome） |
 | `verify/api-check.cjs` | Worker 接口的边界与隐私口径 | 5s（38 项） | 宿主机或容器 |
 | `verify/turnstile-check.cjs` | 人机校验的五条（会自起一个 3099 的失败密钥实例） | 5s（5 项） | **容器内**（用仓库里的 wrangler） |
 | `npm run cf:dry-run` | 部署配置能不能打包 | 3s | 容器内 |
@@ -538,7 +573,7 @@ BASE=http://192.168.31.79:4023 node verify/site-check.cjs --upto=signup
 167.2s），都不含起停浏览器那部分 —— 两趟连着跑实测一共 5m58s，摊到一趟约 2m59s。
 名单先重置成 20 条，起伏主要来自末段与上游 LittleSkin 往返。名单越长末段越贵 —— 见下一节。
 
-`--upto=roster` 单独跑是 266 项里的 248 项（少掉活动日志那 19 项，而收尾那条「控制台错误为 0」
+`--upto=roster` 单独跑是 267 项里的 249 项（少掉活动日志那 19 项，而收尾那条「控制台错误为 0」
 落进名单段），实测约 2m35s。
 
 **只改「小伙伴们」页或四篇活动日志** → 直接跑全套（段在末尾，`--upto` 省不了）；只改

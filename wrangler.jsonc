@@ -55,6 +55,34 @@
       "bucket_name": "club-party"
     }
   ],
+  // 线上日志。仪表盘里已经开了 Observability —— **这里必须跟着写**：Workers 的配置以
+  // 代码/`wrangler.jsonc` 为准，只在仪表盘开、而配置里没有，下一次 `wrangler deploy` 会把它关掉。
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  // 限流（Workers Rate Limiting 绑定，见 worker/littleskin.ts 的 `handleSkinPreview`）。
+  //
+  // 只给 `/api/skin-preview` 用：它是全站唯一一条「公开、无需登录、还会替我们去打上游」的接口，
+  // 一次调用 = 两次 LittleSkin 请求（`/texture/<tid>` + `/textures/<hash>`）。没有闸的话，
+  // 谁都能把它当免费代理刷，同时把上游打到限流。
+  //
+  // ⚠️ 额度**不能按「一个人够用」来定**：教室出口是同一个 IP，几十号人同时预览会共用一个桶。
+  // 所以取 120 次/分钟 —— 脚本刷起来是几千次，而一屋子人正常预览远到不了这个数。
+  "ratelimits": [
+    {
+      "name": "SKIN_PREVIEW_LIMIT",
+      "namespace_id": "20261017",
+      "simple": {"limit": 120, "period": 60}
+    },
+    {
+      // 管理员登录：同一个 IP 一分钟 10 次。口令是唯一的凭据，必须挡住爆破
+      // （见 worker/admin.ts 的 `login`）。教室同一个出口 IP 也不会十几个人同时试后台口令。
+      "name": "ADMIN_LOGIN_LIMIT",
+      "namespace_id": "20261018",
+      "simple": {"limit": 10, "period": 60}
+    }
+  ],
   // 人机校验（Turnstile，见 worker/turnstile.ts）。
   // 密钥**不进配置**：线上 `wrangler secret put TURNSTILE_SECRET`，本地由 `npm run cf:dev`
   // 用 `wrangler dev --var` 带上（刻意不用 `.dev.vars`，理由见 worker/env.d.ts）。这里只放
@@ -63,6 +91,6 @@
     // 本站域名（逗号分隔，不带协议）。**留空 = 不核对域名归属**：widget 那边本来就只在
     // 自己注册过的域名上出票，这一层是「万一」用的。填了之后服务端会比对 siteverify 回来的
     // hostname，对不上就 403。注意只在真实密钥下生效（测试密钥回的 hostname 恒为 example.com）。
-    "TURNSTILE_HOSTNAMES": ""
+    "TURNSTILE_HOSTNAMES": "clubparty.iicemeta.com"
   }
 }

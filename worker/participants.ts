@@ -25,21 +25,57 @@ type Row = {
   created_at: string;
 };
 
+/**
+ * 名单的分页参数。
+ *
+ * `limit` 默认 **100**，不是「一页 24 张」：这条接口不只服务名单页 —— 后台导出、外部脚本、
+ * 以及任何「先把人拿全」的调用方都在用它，把默认值压到一页会悄悄改掉它们的语义。
+ * 名单页自己传 `?limit=24&offset=…`（见 `src/pages/participants.tsx`）。
+ *
+ * 上限 200：真要全量（导出）请走 `/api/admin/participants`，那条是登录后的完整口径。
+ */
+const DEFAULT_LIMIT = 100;
+const MAX_LIMIT = 200;
+
+function clampLimit(raw: string | null): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return DEFAULT_LIMIT;
+  return Math.min(Math.floor(value), MAX_LIMIT);
+}
+
+function clampOffset(raw: string | null): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return Math.floor(value);
+}
+
 export async function listParticipants(request: Request, env: Env): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD') return methodNotAllowed('GET');
 
+  const url = new URL(request.url);
+  const limit = clampLimit(url.searchParams.get('limit'));
+  const offset = clampOffset(url.searchParams.get('offset'));
+
   let rows: Row[];
+  let total: number;
   try {
+    // 总数单独查一次：分页控件要显示「共 N 人」，而 LIMIT 之后的长度说明不了总共有多少
+    const counted = await env.DB.prepare('SELECT COUNT(*) AS total FROM participants').first<{
+      total: number;
+    }>();
+    total = counted?.total ?? 0;
     const result = await env.DB.prepare(
-      'SELECT college, mc_id, skin_key, skin_source, littleskin_tid, created_at FROM participants ORDER BY created_at DESC, id DESC',
-    ).all<Row>();
+      'SELECT college, mc_id, skin_key, skin_source, littleskin_tid, created_at FROM participants ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?',
+    )
+      .bind(limit, offset)
+      .all<Row>();
     rows = result.results ?? [];
   } catch (error) {
     // 表还不存在 = 这个库刚建出来、第一个报名还没来（建表由报名那一刻触发，见 worker/db.ts）。
     // 那不是故障，是「还没有人报名」—— 照常回一份空名单，页面显示 0 人。
     // （读接口刻意**不**顺手建表：GET 触发 DDL 很别扭，而且真正该建表的是报名那条路。）
     if (isMissingTable(error)) {
-      return json({ok: true, count: 0, participants: []});
+      return json({ok: true, count: 0, total: 0, limit, offset, hasMore: false, participants: []});
     }
     // 表在但列不齐（老库没跑 `db:migrate:college:remote` / `db:migrate:source:remote`）会报
     // `no such column` —— 那种是真的没升级完，如实 503。
@@ -48,7 +84,13 @@ export async function listParticipants(request: Request, env: Env): Promise<Resp
 
   return json({
     ok: true,
+    /** 本次返回了几条（等于 `participants.length`，留着给老调用方） */
     count: rows.length,
+    /** 库里一共多少人 —— 分页控件用 */
+    total,
+    limit,
+    offset,
+    hasMore: offset + rows.length < total,
     participants: rows.map((row) => ({
       // 早于这一列的记录，值来自迁移时那条 `DEFAULT ''`（见 worker/migrate-add-college.sql）。
       // 空串就如实给空串，不拿班级去顶；名单页遇到空值不显示这一行。

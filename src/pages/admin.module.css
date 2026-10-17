@@ -1,0 +1,182 @@
+/* 「报名后台」：一页表格 + 两枚导出按钮。
+   语言与站内其他页面一致（标题用 Minecraft 字体，其余走 Docusaurus 变量），
+   但它是个工具页 —— 表格优先于花哨，窄屏靠横向滚动而不是把列挤成豆腐块。 */
+
+.page {
+  padding: 2.5rem 0 4rem;
+}
+
+.head {
+  max-width: 46rem;
+  margin-bottom: 1.75rem;
+}
+
+.title {
+  font-family: Minecraft, Minercraftory, var(--ifm-font-family-base);
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  letter-spacing: 0.04em;
+  margin-bottom: 0.6rem;
+}
+
+.lead {
+  color: var(--ifm-color-emphasis-700);
+  margin-bottom: 0;
+  line-height: 1.8;
+}
+
+.note {
+  padding: 1rem 1.2rem;
+  color: var(--ifm-color-emphasis-700);
+  background: var(--ifm-background-surface-color);
+  border-left: 4px solid var(--ifm-color-emphasis-300);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 26rem;
+  padding: 1.5rem;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 6px;
+}
+
+.label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.input {
+  padding: 0.6rem 0.75rem;
+  font-size: 1rem;
+  color: var(--ifm-font-color-base);
+  background: var(--ifm-background-color);
+  border: 1px solid var(--ifm-color-emphasis-400);
+  border-radius: 4px;
+}
+
+.input:focus {
+  outline: 2px solid var(--ifm-color-primary);
+  outline-offset: 1px;
+}
+
+.submit {
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--ifm-color-primary);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.warn {
+  margin: 0;
+  color: var(--ifm-color-danger);
+}
+
+.hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: var(--ifm-color-emphasis-600);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.who {
+  margin: 0;
+  color: var(--ifm-color-emphasis-800);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.action,
+.actionGhost {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.action {
+  color: #fff;
+  background: var(--ifm-color-primary);
+  border: 1px solid var(--ifm-color-primary);
+}
+
+.action:hover {
+  color: #fff;
+  text-decoration: none;
+  filter: brightness(1.08);
+}
+
+.actionGhost {
+  color: var(--ifm-font-color-base);
+  background: transparent;
+  border: 1px solid var(--ifm-color-emphasis-400);
+}
+
+.actionGhost:hover {
+  border-color: var(--ifm-color-primary);
+}
+
+/* 窄屏别把表格压成豆腐块：整块横向滚动，表头固定 */
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 6px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.table th,
+.table td {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  font-weight: 700;
+  background: var(--ifm-background-surface-color);
+}
+
+.table tbody tr:hover {
+  background: var(--ifm-hover-overlay);
+}
+
+.mono {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.85rem;
+}
+
+.dim {
+  color: var(--ifm-color-emphasis-600);
+}

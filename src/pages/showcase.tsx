@@ -57,7 +57,8 @@ export default function Showcase(): ReactNode {
 
         <Section title="Button / ButtonGroup">
           <FlexBox direction="col" style={{gap: 16}}>
-            <FlexBox align="center" style={{gap: 12}}>
+            {/* 五个按钮一排 ≈ 600px，420px 的手机上会把整页顶出横向滚动条 —— 允许换行 */}
+            <FlexBox align="center" style={{gap: 12, flexWrap: 'wrap'}}>
               <Button variant="primary">Primary</Button>
               <Button variant="secondary">Secondary</Button>
               <Button variant="clear">Clear</Button>

@@ -26,6 +26,22 @@ interface Env {
    * 缺了一律 503，不静默放过。
    */
   TURNSTILE_SECRET?: string;
+
+  /**
+   * 管理员后台的口令表（见 `worker/admin.ts`）。
+   *
+   * 线上：`wrangler secret put ADMIN_PASSWORDS`
+   * 本地：`npm run cf:dev` 带一个测试口令（`npm run cf:dev` 的 `--var`）。
+   *
+   * 格式三种都认，**多管理员请用第一种**（否则日志里只有口令摘要，看不出是谁）：
+   *
+   *     michael:口令A|tom:口令B|tim:口令C
+   *     michael|tom|tim
+   *     [michael, tom, tim]
+   *
+   * 缺了 / 空的后果是**后台登录 503**，不是「放行」—— 与 TURNSTILE_SECRET 同一条规矩。
+   */
+  ADMIN_PASSWORDS?: string;
 }
 
 /**

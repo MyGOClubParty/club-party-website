@@ -23,7 +23,7 @@ const config: Config = {
   },
 
   // Set the production url of your site here
-  url: 'https://club-party.iicemeta.com',
+  url: 'https://clubparty.iicemeta.com',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
   baseUrl: '/',
@@ -72,13 +72,20 @@ const config: Config = {
         theme: {
           customCss: './src/css/custom.css',
         },
+        // 有几个页面**不该被搜索引擎收**，从 sitemap 里排掉：
+        //   - `/admin`：报名后台（robots.txt 也 Disallow 了），它只是给管理员用的表单；
+        //   - `/showcase`：组件演示页，用来核 minecraft-react-ui 的渲染，导航里没有入口，
+        //     对读者没有意义 —— 但它仍然可以访问（本地调库时要用）。
+        sitemap: {
+          ignorePatterns: ['/admin', '/showcase'],
+        },
       } satisfies Preset.Options,
     ],
   ],
 
   themeConfig: {
     // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    image: 'img/social-card.png',
     colorMode: {
       respectPrefersColorScheme: true,
     },

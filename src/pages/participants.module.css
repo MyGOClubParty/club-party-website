@@ -131,3 +131,40 @@
   flex-wrap: wrap;
   gap: 0.35rem;
 }
+
+/* 翻页：一行按钮 + 页码。只在多页时渲染（见 participants.tsx 的 `pageCount > 1`）——
+   只有一页时显示「第 1 / 1 页」是废话，还会让人以为漏了什么。 */
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.pagerButton {
+  padding: 0.45rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ifm-font-color-base);
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-400);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pagerButton:hover:not(:disabled) {
+  color: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+}
+
+.pagerButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pagerStatus {
+  font-variant-numeric: tabular-nums;
+  color: var(--ifm-color-emphasis-700);
+}

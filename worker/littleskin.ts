@@ -258,11 +258,54 @@ export async function skinBytesFromTid(rawTid: string): Promise<TidBytes> {
  * 附带三个 `x-skin-*` 响应头把皮肤名与模型一起带回去 —— 预览区想显示
  * 「白丝猫娘（alex）」这种信息时不用再发第二个请求。名字可能是中文，
  * 响应头只能是 ASCII，所以用 `encodeURIComponent` 编过，前端解码回来。
+ *
+ * ## 两道闸（2026-10-17 加）
+ *
+ * 这是全站唯一一条「公开、无需登录、还会替我们去打上游」的接口 —— 一次调用 = 两次
+ * LittleSkin 请求。上线前加了限流与边缘缓存，理由都写在下面各自的注释里。
  */
-export async function handleSkinPreview(request: Request): Promise<Response> {
+export async function handleSkinPreview(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+): Promise<Response> {
   if (request.method !== 'GET' && request.method !== 'HEAD') return methodNotAllowed('GET');
 
   const tid = new URL(request.url).searchParams.get('tid') ?? '';
+
+  /*
+   * ① 限流。按 IP，但**额度定得宽**（120 次/60s，见 wrangler.jsonc 的 `ratelimits`）：
+   *    教室出口是同一个 IP，几十号人同时预览会共用一个桶。正常使用远到不了这个数，
+   *    而脚本刷起来是几千次 —— 这道闸挡的是后者。
+   */
+  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  const gate = await env.SKIN_PREVIEW_LIMIT.limit({key: `preview:${ip}`});
+  if (!gate.success) {
+    return fail(429, 'too_many_requests', '预览请求太频繁，请稍等几秒再试');
+  }
+
+  /*
+   * ② 边缘缓存。**这才是真正省上游的那一层**：报名页每次改 TID 都会问一次，同一个人反复
+   *    试同一个 TID 很常见；命中之后一个上游请求都不发（这个桶里也就不会掉额度）。
+   *
+   *    key 用**规范化 URL**：`?tid=855158` 与 `?tid=855158&_=时间戳` 必须落到同一份缓存上，
+   *    否则谁都能加个随机参数把缓存全绕过去 —— 那这道缓存就等于没做。
+   */
+  const cacheKey = new Request(
+    `${new URL(request.url).origin}/api/skin-preview?tid=${encodeURIComponent(tid)}`,
+    {method: 'GET'},
+  );
+  const cache = caches.default;
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    // 命中缓存也要处理条件请求，否则浏览器每次都会把图重新收一遍
+    const etag = cached.headers.get('etag');
+    if (etag && request.headers.get('if-none-match') === etag) {
+      return new Response(null, {status: 304, headers: cached.headers});
+    }
+    return cached;
+  }
+
   const result = await skinBytesFromTid(tid);
   if (!result.ok) return fail(result.status, result.code, result.message);
 
@@ -280,5 +323,12 @@ export async function handleSkinPreview(request: Request): Promise<Response> {
   if (request.headers.get('if-none-match') === headers.get('etag')) {
     return new Response(null, {status: 304, headers});
   }
-  return new Response(request.method === 'HEAD' ? null : result.bytes, {headers});
+
+  const response = new Response(request.method === 'HEAD' ? null : result.bytes, {headers});
+  // 只缓存 GET 的 200：HEAD 的 body 是空的，让它进缓存会把下一份正常请求变成空图。
+  // 写缓存走 `waitUntil`，别让读者为了「我们存缓存」多等一毫秒。
+  if (request.method === 'GET') {
+    ctx.waitUntil(cache.put(cacheKey, response.clone()).catch(() => undefined));
+  }
+  return response;
 }

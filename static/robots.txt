@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# 报名后台。没有登录口令进来只会看到一页表单，索引它没有意义，还会在搜索结果里
+# 露出一句「管理员登录」，让读者以为站点后面有个不该看的东西。
+Disallow: /admin
+
+Sitemap: https://clubparty.iicemeta.com/sitemap.xml

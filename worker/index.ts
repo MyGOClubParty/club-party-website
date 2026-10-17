@@ -3,10 +3,12 @@
  * 由 `assets.binding` 以 `env.ASSETS.fetch()` 提供；这个 Worker 只管 `/api/*`：
  *
  *   POST /api/register            活动报名（multipart；皮肤可选：上传文件或填 LittleSkin TID）→ D1 + R2
- *   GET  /api/participants        已报名名单（**不含学号与 QQ**）
+ *   GET  /api/participants        已报名名单（**不含学号与 QQ**；支持 `?limit=&offset=` 分页）
  *   GET  /api/skins/<key>         从 R2 取一张皮肤
- *   GET  /api/skin-preview?tid=   报名页用：按 LittleSkin TID 取回皮肤 PNG（同源代理）
+ *   GET  /api/skin-preview?tid=   报名页用：按 LittleSkin TID 取回皮肤 PNG（同源代理，带边缘缓存与限流）
  *   GET  /api/health              存活探测
+ *   POST /api/admin/login         管理员登录（口令在 `ADMIN_PASSWORDS`，见 worker/admin.ts）
+ *   GET  /api/admin/participants  完整名单（含学号/姓名/班级/QQ）+ `?format=csv|txt` 导出
  *
  * 请求是怎么走到这里的（由 wrangler.jsonc 的 assets 配置决定，别只看这个文件）：
  *   - `/api/*`：`run_worker_first` 命中 → 一定进这个 fetch，不看静态资产；
@@ -20,6 +22,7 @@
  * 不在本文件手写 —— 绑定名以 wrangler.jsonc 为单一事实源。
  */
 
+import {handleAdmin} from './admin';
 import {fail, json} from './http';
 import {handleSkinPreview} from './littleskin';
 import {listParticipants, serveSkin} from './participants';
@@ -27,7 +30,7 @@ import {handleRegister} from './register';
 
 const SKIN_PREFIX = '/api/skins/';
 
-async function route(request: Request, env: Env): Promise<Response> {
+async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const {pathname} = new URL(request.url);
 
   if (pathname === '/api/health') {
@@ -40,7 +43,9 @@ async function route(request: Request, env: Env): Promise<Response> {
 
   if (pathname === '/api/register') return handleRegister(request, env);
   if (pathname === '/api/participants') return listParticipants(request, env);
-  if (pathname === '/api/skin-preview') return handleSkinPreview(request);
+  // 预览要 `env`（限流绑定）与 `ctx`（缓存写入要 `waitUntil`，别拖慢响应）
+  if (pathname === '/api/skin-preview') return handleSkinPreview(request, env, ctx);
+  if (pathname.startsWith('/api/admin/')) return handleAdmin(request, env);
   if (pathname.startsWith(SKIN_PREFIX)) {
     return serveSkin(request, env, decodeURIComponent(pathname.slice(SKIN_PREFIX.length)));
   }
@@ -52,9 +57,9 @@ async function route(request: Request, env: Env): Promise<Response> {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
-      return await route(request, env);
+      return await route(request, env, ctx);
     } catch (error) {
       // 兜底：栈进 Worker 日志（`wrangler dev` / `wrangler tail` 能看），
       // 对外只给一句话 —— 别把内部细节当成响应体漏出去

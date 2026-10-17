@@ -14,6 +14,16 @@ import styles from './participants.module.css';
 /** 没有上传皮肤的同学统一穿这一张（需求指定的图，放在 static/img/skins/ 下）。 */
 const DEFAULT_SKIN = '/img/skins/deepseek-npz.png';
 
+/**
+ * 一页多少张卡片。
+ *
+ * ⚠️ 这个数 **必须与验收里那条「页面卡片数 = 接口 count」一致**（`verify/site-check.cjs` 的
+ * 名单段会带同样的 `?limit=` 去问接口）。改这里就要同步改那边，否则名单一超过一页就会红。
+ *
+ * 24 = 4~5 列 × 5~6 行，一屏多一点：翻一页刚好换一屏，也不会让 DOM 里同时挂几十块 2D 画布。
+ */
+const PAGE_SIZE = 24;
+
 type Participant = {
   /** 学院。可能是空串（早于这一列的记录），那就整行不显示，见下面卡片里的判断。 */
   college: string;
@@ -32,19 +42,29 @@ type Participant = {
 type State =
   | {kind: 'loading'}
   | {kind: 'error'; message: string}
-  | {kind: 'ready'; participants: Participant[]};
+  | {kind: 'ready'; participants: Participant[]; total: number};
+
+/** 第几页（**从 0 开始**）。`?page=2` 在地址栏里就是第 2 页。 */
+function pageFromUrl(): number {
+  if (typeof window === 'undefined') return 0;
+  const value = Number(new URLSearchParams(window.location.search).get('page'));
+  return Number.isFinite(value) && value >= 2 ? Math.floor(value) - 1 : 0;
+}
 
 export default function Participants(): ReactNode {
   const [state, setState] = useState<State>({kind: 'loading'});
+  /** 当前页，从 0 开始。 */
+  const [page, setPage] = useState(0);
   /** 正在放大查看的那个人；null = 弹窗关着。 */
   const [peek, setPeek] = useState<Participant | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (target: number) => {
     setState({kind: 'loading'});
     try {
-      const response = await fetch('/api/participants', {headers: {accept: 'application/json'}});
+      const query = new URLSearchParams({limit: String(PAGE_SIZE), offset: String(target * PAGE_SIZE)});
+      const response = await fetch(`/api/participants?${query}`, {headers: {accept: 'application/json'}});
       const payload = (await response.json().catch(() => null)) as
-        | {ok: true; participants: Participant[]}
+        | {ok: true; participants: Participant[]; total?: number}
         | {ok: false; message?: string}
         | null;
       if (!response.ok || !payload || !payload.ok) {
@@ -56,17 +76,45 @@ export default function Participants(): ReactNode {
         });
         return;
       }
-      setState({kind: 'ready', participants: payload.participants});
+      setState({
+        kind: 'ready',
+        participants: payload.participants,
+        // 老接口没有 total 时退回「这一页的条数」，至少不会显示成 0
+        total: typeof payload.total === 'number' ? payload.total : payload.participants.length,
+      });
     } catch {
       setState({kind: 'error', message: '网络异常，名单没读回来'});
     }
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void load(page);
+  }, [load, page]);
 
-  const count = state.kind === 'ready' ? state.participants.length : null;
+  // 首次进页面时，地址栏里可能带着 `?page=2`（分享 / 刷新），把它认下来。
+  // 放在 effect 里而不是 useState 的初始值：SSR 那一帧没有 window，直接用会 hydration 对不上。
+  useEffect(() => {
+    const fromUrl = pageFromUrl();
+    if (fromUrl !== 0) setPage(fromUrl);
+  }, []);
+
+  // 翻页同步回地址栏（replaceState，不往历史里塞一堆条目 —— 否则「返回」要按十几次）
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (page === 0) url.searchParams.delete('page');
+    else url.searchParams.set('page', String(page + 1));
+    window.history.replaceState({}, '', url);
+  }, [page]);
+
+  const total = state.kind === 'ready' ? state.total : null;
+  const pageCount = total === null ? 0 : Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const goPage = (target: number) => {
+    if (target < 0 || (total !== null && target >= pageCount)) return;
+    setPage(target);
+    // 换页等于换内容，回到顶部才不会让人以为「点了一下什么都没发生」
+    if (typeof window !== 'undefined') window.scrollTo({top: 0, behavior: 'smooth'});
+  };
 
   return (
     <Layout
@@ -80,13 +128,13 @@ export default function Participants(): ReactNode {
             </Heading>
             <p className={styles.lead}>
               已经报名的同学都在这里
-              {count !== null ? <>（<strong data-participant-count>{count}</strong> 人）</> : null}
+              {total !== null ? <>（<strong data-participant-count>{total}</strong> 人）</> : null}
               ，每人一格 3D 皮肤，都在原地走路。<strong>点任意一格</strong>可以放大查看 ——
               拖拽旋转、滚轮缩放，还能切动作、开自动旋转。卡片下面写着这张皮肤是哪来的
               （自己上传的 / 取自 LittleSkin / 默认皮肤）；还没提供皮肤的同学目前穿着默认皮肤，
               想换成自己的就去 <Link to="/signup">活动报名</Link> 补一份。
             </p>
-            <Button variant="secondary" onClick={() => void load()}>
+            <Button variant="secondary" onClick={() => void load(page)}>
               重新读取
             </Button>
           </header>
@@ -108,7 +156,9 @@ export default function Participants(): ReactNode {
 
           {state.kind === 'ready' && state.participants.length === 0 ? (
             <p className={styles.note} data-participants-state="empty">
-              还没有人报名 —— 第一个填表的同学就能占到头一格。
+              {state.total === 0
+                ? '还没有人报名 —— 第一个填表的同学就能占到头一格。'
+                : '这一页没有内容了（报名人数可能刚变过），回到第一页看看。'}
             </p>
           ) : null}
 
@@ -175,6 +225,31 @@ export default function Participants(): ReactNode {
                 );
               })}
             </ul>
+          ) : null}
+
+          {/* 只有一页时不渲染这块 —— 「第 1 / 1 页」是废话，反而让人以为还有下一页 */}
+          {pageCount > 1 ? (
+            <nav className={styles.pager} data-participants-pager>
+              <button
+                type="button"
+                className={styles.pagerButton}
+                onClick={() => goPage(page - 1)}
+                disabled={page === 0}
+                data-participants-prev>
+                上一页
+              </button>
+              <span className={styles.pagerStatus} data-participants-page={page + 1}>
+                第 <strong>{page + 1}</strong> / {pageCount} 页
+              </span>
+              <button
+                type="button"
+                className={styles.pagerButton}
+                onClick={() => goPage(page + 1)}
+                disabled={page >= pageCount - 1}
+                data-participants-next>
+                下一页
+              </button>
+            </nav>
           ) : null}
         </div>
 
