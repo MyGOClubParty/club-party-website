@@ -26,11 +26,11 @@
  */
 
 import {ensureSchema, isMissingTable} from './db';
+import {validateRegistration} from './fields';
 import {fail, json, methodNotAllowed} from './http';
 import {skinBytesFromTid} from './littleskin';
 import {verifyTurnstile} from './turnstile';
 import {
-  MC_ID_RE,
   MAX_BODY_BYTES,
   MAX_SKIN_BYTES,
   inspectSkin,
@@ -40,59 +40,9 @@ import {
 
 const MULTIPART = 'multipart/form-data';
 
-/**
- * 学号是**本校的 10 位数字**（如 `2026010101`）。早先写成 `4–20` 位是为了宽容，
- * 但报名页的提示写着 10 位 —— 提示与实际判定不一致时，同学会照着提示填、然后被后端
- * 用另一套规则拒掉。两处只能是同一个数，所以收紧到这里，前端那份也同步（signup.tsx）。
- */
-const STUDENT_ID_RE = /^\d{10}$/;
-const QQ_RE = /^\d{5,12}$/;
-/** 控制字符一律不收（换行、制表符塞进字段里会把后续展示弄乱）。 */
-const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
-
-type Registration = {
-  studentId: string;
-  name: string;
-  college: string;
-  className: string;
-  qq: string;
-  mcId: string;
-};
-
-type FieldResult = {ok: true; value: Registration} | {ok: false; message: string};
-
 function text(form: FormData, key: string): string {
   const raw = form.get(key);
   return typeof raw === 'string' ? raw.trim() : '';
-}
-
-function parseRegistration(form: FormData): FieldResult {
-  const studentId = text(form, 'studentId');
-  const name = text(form, 'name');
-  const college = text(form, 'college');
-  const className = text(form, 'className');
-  const qq = text(form, 'qq');
-  const mcId = text(form, 'mcId');
-
-  if (!STUDENT_ID_RE.test(studentId)) {
-    return {ok: false, message: '请填写学号（10 位数字）'};
-  }
-  if (!name || name.length > 20 || CONTROL_CHARS.test(name)) {
-    return {ok: false, message: '请填写姓名（1–20 个字）'};
-  }
-  if (!college || college.length > 40 || CONTROL_CHARS.test(college)) {
-    return {ok: false, message: '请填写学院（1–40 个字，写全称）'};
-  }
-  if (!className || className.length > 40 || CONTROL_CHARS.test(className)) {
-    return {ok: false, message: '请填写班级（1–40 个字）'};
-  }
-  if (!QQ_RE.test(qq)) {
-    return {ok: false, message: '请填写 QQ 号（5–12 位数字）'};
-  }
-  if (!MC_ID_RE.test(mcId)) {
-    return {ok: false, message: '请填写 Minecraft 游戏 ID（字母、数字、下划线，最长 32 位）'};
-  }
-  return {ok: true, value: {studentId, name, college, className, qq, mcId}};
 }
 
 export async function handleRegister(request: Request, env: Env): Promise<Response> {
@@ -127,7 +77,16 @@ export async function handleRegister(request: Request, env: Env): Promise<Respon
   const gate = await verifyTurnstile(request, env, form);
   if (!gate.ok) return fail(gate.status, gate.code, gate.message);
 
-  const fields = parseRegistration(form);
+  // 字段规则在 `worker/fields.ts`（与后台编辑共用一份 —— 两处分叉会出现「报名收得下、
+  // 后台改不回去」）
+  const fields = validateRegistration({
+    studentId: text(form, 'studentId'),
+    name: text(form, 'name'),
+    college: text(form, 'college'),
+    className: text(form, 'className'),
+    qq: text(form, 'qq'),
+    mcId: text(form, 'mcId'),
+  });
   if (!fields.ok) return fail(400, 'invalid_field', fields.message);
   const {studentId, name, college, className, qq, mcId} = fields.value;
 

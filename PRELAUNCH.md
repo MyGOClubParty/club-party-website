@@ -22,6 +22,7 @@
 | 2.6 observability | 写进 `wrangler.jsonc`（仪表盘开的同时代码里也要有） | `cf:dry-run` 通过 |
 | 2.7 管理后台 | 新增 `/admin`：登录、看完整名单、导出 CSV / TXT | `api-check` **43/43**；401 / 200 / 退出后 401 都实测过 |
 | 2.8 登录防爆破 | 登录加 **Turnstile**（action=`admin`，与报名页的票不能串用）+ 10/60s/IP 限流 + 摘要比对；票一次性，失败即 `reset()` 重出票 | 无票 → `403 turnstile_missing`；有票错口令 → `401 bad_password`；有票对口令 → 200。`api-check` 为此加了 3 条 |
+| 2.9 后台编辑 | 表格行内编辑六个字段（学号/姓名/学院/班级/QQ/MCID），`PATCH /api/admin/participants`；校验与报名**同一份**（`worker/fields.ts`）；学号先查重，皮肤不跟着改名 | `api-check` **47/47**（+4：登录、未登录 401、改完公开名单读到新值、非法值 400） |
 | 3.1 分页 | `/api/participants?limit=&offset=`，前端每页 24；新增 `total` / `hasMore` | 接口断言 2 条 + 套件里 1 条 |
 | 3.4 死代码 | 删 `HomepageFeatures/` 与 3 个 `undraw_docusaurus_*.svg`、`docusaurus.png` | 产物少 84.5 KB |
 | 3.6 hostname | `TURNSTILE_HOSTNAMES` 填 `clubparty.iicemeta.com`（测试密钥下自动跳过） | 本地仍可报名 |
@@ -30,6 +31,9 @@
 ### 管理员后台
 
 - 入口 `/admin`（**不在导航、不在 sitemap、`robots.txt` 也 Disallow**）。
+- **能改人**：表格里点「编辑」，在那一行下面摊开六个字段（学号/姓名/学院/班级/QQ/Minecraft ID），
+  保存走 `PATCH /api/admin/participants`。校验与报名是**同一份**（`worker/fields.ts`）；
+  学号可改但要先查重（撞号 409）；**皮肤文件不跟着改名**（改名要跨 D1 与 R2，中途失败会留脏记录）。
 - 口令放 `ADMIN_PASSWORDS`（secret）。格式三种都认：
 
   ```

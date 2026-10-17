@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode} from 'react';
+import {Fragment, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode} from 'react';
 import Layout from '@theme/Layout';
 import Heading from '@theme/Heading';
 
@@ -10,12 +10,13 @@ import {
 import styles from './admin.module.css';
 
 /**
- * 报名后台 —— 登录、看完整名单、导出 CSV / TXT。
+ * 报名后台 —— 登录、看完整名单、改填错的信息、导出 CSV / TXT。
  *
- * ## 页面只做三件事，判定全在服务端
+ * ## 页面只做接口调用，判定全在服务端
  *
- * 这里没有一行「密码对不对」的判断：口令校验、签名 cookie、导出权限都在 `worker/admin.ts`。
- * 前端拿到的只有 `{user: "michael"}` 或 401 —— 一条越权路径都没留。
+ * 这里没有一行「密码对不对」的判断：口令校验、签名 cookie、导出权限、可改哪些字段、
+ * 学号撞不撞车，全在 `worker/admin.ts`。前端拿到的只有 `{user: "michael"}` 或 401 ——
+ * 一条越权路径都没留。
  *
  * ## 为什么导出用 `<a href>` 而不是 fetch + Blob
  *
@@ -57,11 +58,38 @@ function sourceLabel(row: AdminRow): string {
   return row.skinKey ? '未记录' : '默认皮肤';
 }
 
+/**
+ * 能改的六个字段。
+ *
+ * 皮肤**不在这里改**：换皮肤要上传文件，而重报名那条路本来就走得通；后台只负责把填错的
+ * 文字改对。`skin_key`（R2 对象名）也不会跟着改 —— 见 `worker/admin.ts` 的 `update`。
+ */
+type DraftKey = 'studentId' | 'name' | 'college' | 'className' | 'qq' | 'mcId';
+type Draft = Record<DraftKey, string>;
+
+const EDIT_FIELDS: ReadonlyArray<{key: DraftKey; label: string; hint?: string}> = [
+  {key: 'studentId', label: '学号', hint: '10 位数字，唯一'},
+  {key: 'name', label: '姓名'},
+  {key: 'college', label: '学院'},
+  {key: 'className', label: '班级'},
+  {key: 'qq', label: 'QQ'},
+  {key: 'mcId', label: 'Minecraft ID', hint: '字母、数字、下划线'},
+];
+
+const EMPTY_DRAFT: Draft = {studentId: '', name: '', college: '', className: '', qq: '', mcId: ''};
+
 export default function Admin(): ReactNode {
   const [state, setState] = useState<State>({kind: 'checking'});
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  /** 正在编辑的那一行（原学号）；`null` = 没有在编辑。 */
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  /** 保存成功后的回执（比如「改了 college、qq」），与登录失败那类警告分开。 */
+  const [saved, setSaved] = useState<string | null>(null);
   /** 人机校验 widget 的状态。`loading` 时允许提交（取不到票服务端会明说），`error` 时禁掉按钮。 */
   const [gateState, setGateState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [gateError, setGateError] = useState('');
@@ -219,6 +247,52 @@ export default function Admin(): ReactNode {
     setNotice('已退出');
   };
 
+  /** 把这一行摊开成表单。改的是副本，点「保存」之前不碰服务端。 */
+  const startEdit = (row: AdminRow) => {
+    setEditing(row.studentId);
+    setDraft({
+      studentId: row.studentId,
+      name: row.name,
+      college: row.college,
+      className: row.className,
+      qq: row.qq,
+      mcId: row.mcId,
+    });
+    setEditError(null);
+    setSaved(null);
+  };
+
+  const saveEdit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editing || saving) return;
+    setSaving(true);
+    setEditError(null);
+    try {
+      const response = await fetch('/api/admin/participants', {
+        method: 'PATCH',
+        headers: {'content-type': 'application/json'},
+        body: JSON.stringify({originalStudentId: editing, ...draft}),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {ok: true; changed: string[]}
+        | {ok: false; message?: string}
+        | null;
+      if (!response.ok || !payload || !payload.ok) {
+        setEditError(
+          (payload && 'message' in payload && payload.message) || `保存失败（HTTP ${response.status}）`,
+        );
+        return;
+      }
+      setEditing(null);
+      setSaved(payload.changed.length ? `已保存：改了 ${payload.changed.join('、')}` : '没有改动');
+      if (state.kind === 'ready') await loadRows(state.user);
+    } catch {
+      setEditError('网络异常，没保存成功');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Layout title={TITLE} description="活动报名后台：查看完整名单并导出。">
       <main className={styles.page} data-admin>
@@ -307,6 +381,12 @@ export default function Admin(): ReactNode {
                 </div>
               </div>
 
+              {saved ? (
+                <p className={styles.saved} data-admin-saved>
+                  {saved}
+                </p>
+              ) : null}
+
               {state.rows.length === 0 ? (
                 <p className={styles.note}>还没有人报名。</p>
               ) : (
@@ -323,21 +403,86 @@ export default function Admin(): ReactNode {
                         <th>Minecraft ID</th>
                         <th>皮肤</th>
                         <th>报名时间</th>
+                        <th>操作</th>
                       </tr>
                     </thead>
                     <tbody>
                       {state.rows.map((row, index) => (
-                        <tr key={row.studentId}>
-                          <td className={styles.dim}>{index + 1}</td>
-                          <td className={styles.mono}>{row.studentId}</td>
-                          <td>{row.name}</td>
-                          <td>{row.college}</td>
-                          <td>{row.className}</td>
-                          <td className={styles.mono}>{row.qq}</td>
-                          <td className={styles.mono}>{row.mcId}</td>
-                          <td className={styles.dim}>{sourceLabel(row)}</td>
-                          <td className={styles.dim}>{row.registeredAt}</td>
-                        </tr>
+                        <Fragment key={row.studentId}>
+                          <tr>
+                            <td className={styles.dim}>{index + 1}</td>
+                            <td className={styles.mono}>{row.studentId}</td>
+                            <td>{row.name}</td>
+                            <td>{row.college}</td>
+                            <td>{row.className}</td>
+                            <td className={styles.mono}>{row.qq}</td>
+                            <td className={styles.mono}>{row.mcId}</td>
+                            <td className={styles.dim}>{sourceLabel(row)}</td>
+                            <td className={styles.dim}>{row.registeredAt}</td>
+                            <td>
+                              <button
+                                type="button"
+                                className={styles.editButton}
+                                data-admin-edit={row.studentId}
+                                aria-expanded={editing === row.studentId}
+                                onClick={() =>
+                                  editing === row.studentId ? setEditing(null) : startEdit(row)
+                                }>
+                                {editing === row.studentId ? '收起' : '编辑'}
+                              </button>
+                            </td>
+                          </tr>
+                          {/* 编辑表单摊在这一行下面，而不是弹窗：改的时候还能看见原值 */}
+                          {editing === row.studentId ? (
+                            <tr className={styles.editRow}>
+                              <td colSpan={10}>
+                                <form
+                                  className={styles.editForm}
+                                  onSubmit={saveEdit}
+                                  data-admin-edit-form={row.studentId}>
+                                  {EDIT_FIELDS.map((field) => (
+                                    <label key={field.key} className={styles.editField}>
+                                      <span className={styles.editLabel}>
+                                        {field.label}
+                                        {field.hint ? <em className={styles.editHint}>{field.hint}</em> : null}
+                                      </span>
+                                      <input
+                                        className={styles.input}
+                                        value={draft[field.key]}
+                                        onChange={(event) =>
+                                          setDraft((current) => ({
+                                            ...current,
+                                            [field.key]: event.target.value,
+                                          }))
+                                        }
+                                        required
+                                      />
+                                    </label>
+                                  ))}
+                                  <div className={styles.editActions}>
+                                    <button className={styles.submit} type="submit" disabled={saving}>
+                                      {saving ? '保存中…' : '保存'}
+                                    </button>
+                                    <button
+                                      className={styles.actionGhost}
+                                      type="button"
+                                      onClick={() => {
+                                        setEditing(null);
+                                        setEditError(null);
+                                      }}>
+                                      取消
+                                    </button>
+                                  </div>
+                                  {editError ? <p className={styles.warn}>{editError}</p> : null}
+                                  <p className={styles.hint}>
+                                    改学号会撞号（它是唯一键）。
+                                    <strong>皮肤文件不会跟着改名</strong> —— 想换皮肤请让同学重新报名。
+                                  </p>
+                                </form>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>

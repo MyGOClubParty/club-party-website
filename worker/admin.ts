@@ -35,6 +35,7 @@
  * 否则本地根本设不上这个 cookie，测不了。
  */
 
+import {validateRegistration} from './fields';
 import {fail, json, methodNotAllowed} from './http';
 import {TURNSTILE_ADMIN_ACTION, verifyTurnstileToken} from './turnstile';
 
@@ -445,12 +446,128 @@ async function list(request: Request, env: Env): Promise<Response> {
   return fail(400, 'bad_format', 'format 只支持 json / csv / txt');
 }
 
+/**
+ * `PATCH /api/admin/participants` —— 改某一位同学的信息。
+ *
+ * 为什么需要它：同学**填错一个字**（学院写错、QQ 手滑、游戏 ID 大小写）就得找工作人员，
+ * 而在有这条接口之前，「怎么改」的答案是「用 `wrangler d1 execute` 直连线上库手写 UPDATE」
+ * —— 没有校验、没有留痕、没有二次确认。这里把同一件事变成一次可审计的操作。
+ *
+ * ## 只改人，不改皮肤
+ *
+ * `skin_key`（R2 对象名 = mcId + 学号后两位）**不跟着改**。改名要在 R2 里 copy + delete，
+ * 而 D1 与 R2 不是一个事务，中途失败就会留下一条指向不存在对象的记录 —— 那是这次改动
+ * 唯一可能把库弄脏的地方，所以干脆不做。对象名只是一份给人看的语义，取图认的是
+ * `skin_key` 本身，功能上一点不影响。想换皮肤请重新报名。
+ *
+ * ## 学号可以改，但先查重
+ *
+ * 学号是 UNIQUE 键，也是「这是谁」的依据。允许改（填错学号是最常见的求助），但先自己
+ * 查一遍，撞号给 409 而不是让 SQLite 抛一个看不懂的错。
+ *
+ * ## 改了什么要能查
+ *
+ * 每次改动都 `console.log('[admin] update by=… from=… to=… changed=…')` —— Observability
+ * 里能翻到「谁在什么时候把谁的学院从 A 改成了 B」。这也是一条不建表就能做到的审计线。
+ */
+async function update(request: Request, env: Env): Promise<Response> {
+  const user = await currentUser(request, env);
+  if (!user) return fail(401, 'unauthorized', '请先登录');
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return fail(400, 'bad_json', '请求格式不对');
+  }
+
+  const original = typeof body.originalStudentId === 'string' ? body.originalStudentId.trim() : '';
+  if (!/^\d{10}$/.test(original)) {
+    return fail(400, 'bad_target', '没指定要改哪一条（originalStudentId 应该是 10 位学号）');
+  }
+
+  const str = (value: unknown) => (typeof value === 'string' ? value : '');
+  // 与报名**同一份**规则（worker/fields.ts）—— 两处分叉会出现「报名收得下、后台改不回去」
+  const checked = validateRegistration({
+    studentId: str(body.studentId),
+    name: str(body.name),
+    college: str(body.college),
+    className: str(body.className),
+    qq: str(body.qq),
+    mcId: str(body.mcId),
+  });
+  if (!checked.ok) return fail(400, 'invalid_field', checked.message);
+  const next = checked.value;
+
+  let before: AdminRow | null;
+  try {
+    before = await env.DB.prepare(
+      `SELECT ${COLUMNS.join(', ')} FROM participants WHERE student_id = ?`,
+    )
+      .bind(original)
+      .first<AdminRow>();
+  } catch (error) {
+    console.error('[admin] update read failed', error instanceof Error ? error.message : error);
+    return fail(503, 'db_unavailable', '读不到这条记录，请稍后重试');
+  }
+  if (!before) return fail(404, 'not_found', `没有学号为 ${original} 的报名记录`);
+
+  const changed: string[] = [];
+  const compare = (key: string, was: string | null, now: string) => {
+    if ((was ?? '') !== now) changed.push(key);
+  };
+  compare('studentId', before.student_id, next.studentId);
+  compare('name', before.name, next.name);
+  compare('college', before.college, next.college);
+  compare('className', before.class_name, next.className);
+  compare('qq', before.qq, next.qq);
+  compare('mcId', before.mc_id, next.mcId);
+
+  // 一个字都没改就别写库了 —— 也免得在日志里留下一条「改了 0 个字段」的噪声
+  if (changed.length === 0) {
+    return json({ok: true, changed, studentId: next.studentId});
+  }
+
+  if (next.studentId !== original) {
+    const clash = await env.DB.prepare('SELECT id FROM participants WHERE student_id = ?')
+      .bind(next.studentId)
+      .first();
+    if (clash) {
+      return fail(409, 'student_id_taken', `学号 ${next.studentId} 已经被另一条记录占用`);
+    }
+  }
+
+  try {
+    await env.DB.prepare(
+      'UPDATE participants SET student_id = ?, name = ?, college = ?, class_name = ?, qq = ?, mc_id = ? WHERE student_id = ?',
+    )
+      .bind(next.studentId, next.name, next.college, next.className, next.qq, next.mcId, original)
+      .run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes('UNIQUE')) {
+      return fail(409, 'student_id_taken', `学号 ${next.studentId} 已经被另一条记录占用`);
+    }
+    console.error('[admin] update failed', message);
+    return fail(503, 'store_failed', '保存失败，请稍后重试');
+  }
+
+  console.log(
+    `[admin] update by=${user} from=${original} to=${next.studentId} changed=${changed.join(',')}`,
+  );
+  return json({ok: true, changed, studentId: next.studentId});
+}
+
 /** `/api/admin/*` 的入口。 */
 export async function handleAdmin(request: Request, env: Env): Promise<Response> {
   const {pathname} = new URL(request.url);
   if (pathname === '/api/admin/login') return login(request, env);
   if (pathname === '/api/admin/logout') return logout(request);
   if (pathname === '/api/admin/session') return whoami(request, env);
-  if (pathname === '/api/admin/participants') return list(request, env);
+  if (pathname === '/api/admin/participants') {
+    // PATCH 改人、GET 读人 —— 同一个资源名，按方法分派
+    if (request.method === 'PATCH') return update(request, env);
+    return list(request, env);
+  }
   return fail(404, 'no_such_endpoint', '没有这个后台接口');
 }

@@ -478,7 +478,7 @@ texture.flipY)`，`Texture.flipY` 默认 `true`）—— `<img>` 那条路一直
 
 ### 报名后台（`/admin`）
 
-只读的运营工具：登录、看完整名单、导出 CSV / TXT。**不在导航、不在 sitemap、`robots.txt` 也
+运营工具：登录、看完整名单、**改填错的信息**、导出 CSV / TXT。**不在导航、不在 sitemap、`robots.txt` 也
 Disallow** —— 后台不需要被发现。
 
 - 口令：`wrangler secret put ADMIN_PASSWORDS`，格式 `名字:口令|名字:口令|…`
@@ -493,6 +493,15 @@ Disallow** —— 后台不需要被发现。
      票是一次性的，前端每次失败都会 `reset()` 重新出票，否则第二次拿到的是「已过期」而不是「口令不对」；
   2. **10 次/60s/IP**（挡连点，`ADMIN_LOGIN_LIMIT`）；
   3. **口令摘要比对**（防时序侧信道，循环不提前 break）。
+- **能改人**：表格每行有「编辑」，点开在那一行下面摊一张表单（学号 / 姓名 / 学院 / 班级 / QQ /
+  Minecraft ID），保存走 `PATCH /api/admin/participants`。校验与报名是**同一份**
+  （`worker/fields.ts`）—— 两处分叉会出现「报名收得下、后台改不回去」这种荒唐事。
+  - 学号可以改（填错学号是最常见的求助），但先查重，撞号回 409；
+  - **皮肤不跟着改**：`skin_key`（R2 对象名 = mcId + 学号后两位）保持原样。改名要在 R2 里
+    copy + delete，而 D1 与 R2 不是一个事务，中途失败会留下一条指向不存在对象的记录 ——
+    那是这个功能里唯一可能把库弄脏的地方，所以干脆不做。想换皮肤请让同学重新报名；
+  - 每次改动都 `console.log('[admin] update by=… from=… changed=…')`，Observability 里能翻到
+    「谁在什么时候把谁的学院从 A 改成了 B」。
 - 口令长度服务端**不强制**（配置是人填的，强制只会让所有人 503），但短于 8 位会在日志里 warn 一声
   —— 建议用 12 位以上的随机串。
 

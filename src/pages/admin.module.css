@@ -186,3 +186,75 @@
 .dim {
   color: var(--ifm-color-emphasis-600);
 }
+
+/* 保存成功后的回执。与 `.warn`（错误）分开：一个是「改好了」，一个是「没改成」。 */
+.saved {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.9rem;
+  color: var(--ifm-color-success-dark);
+  background: var(--ifm-color-success-contrast-background, var(--ifm-background-surface-color));
+  border-left: 4px solid var(--ifm-color-success);
+}
+
+/* 行内编辑：按钮在最后一列，表单摊在它下面那一行 */
+.editButton {
+  padding: 0.25rem 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ifm-color-primary);
+  background: transparent;
+  border: 1px solid var(--ifm-color-primary);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.editButton:hover {
+  color: #fff;
+  background: var(--ifm-color-primary);
+}
+
+.editRow td {
+  padding: 0.9rem 0.75rem 1rem;
+  background: var(--ifm-background-surface-color);
+}
+
+.editForm {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem 1rem;
+  align-items: end;
+}
+
+.editField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.editLabel {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  font-weight: 600;
+}
+
+/* 字段旁的「10 位数字，唯一」这类说明：小一号、不抢眼，但别用 disabled 那种灰 */
+.editHint {
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--ifm-color-emphasis-600);
+}
+
+.editActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* 表单里那两条提示要占满一整行，否则会被 grid 挤成一列 */
+.editForm .hint,
+.editForm .warn {
+  grid-column: 1 / -1;
+  margin: 0;
+}
