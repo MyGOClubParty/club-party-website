@@ -18,12 +18,23 @@
       "project": "元山商校园展示",
       "summary": "活动主办方。负责活动服务器搭建、元山商校园还原工程场景部署、客户端整合与联机测试，并明确服务器地址、开放时间与连接方法。",
       "tags": ["元山商", "校园还原", "服务器"],
-      "logo": "/img/clubs/mc-coal/logo.svg",
-      "cover": "/img/clubs/mc-coal/cover.svg",
+      "logo": "/img/clubs/mc-coal/logo.png",
+      "cover": "/img/clubs/mc-coal/shot-1.jpg",
       "images": [
-        "/img/clubs/mc-coal/shot-1.svg",
-        "/img/clubs/mc-coal/shot-2.svg",
-        "/img/clubs/mc-coal/shot-3.svg"
+        "/img/clubs/mc-coal/shot-1.jpg",
+        "/img/clubs/mc-coal/shot-2.jpg",
+        "/img/clubs/mc-coal/shot-3.jpg",
+        "/img/clubs/mc-coal/shot-4.jpg",
+        "/img/clubs/mc-coal/shot-5.jpg",
+        "/img/clubs/mc-coal/shot-6.jpg",
+        "/img/clubs/mc-coal/shot-7.jpg",
+        "/img/clubs/mc-coal/shot-8.jpg",
+        "/img/clubs/mc-coal/shot-9.jpg",
+        "/img/clubs/mc-coal/shot-10.jpg",
+        "/img/clubs/mc-coal/shot-11.jpg",
+        "/img/clubs/mc-coal/shot-12.jpg",
+        "/img/clubs/mc-coal/shot-13.jpg",
+        "/img/clubs/mc-coal/shot-14.jpg"
       ],
       "doc": "/docs/clubs/mc-coal"
     },

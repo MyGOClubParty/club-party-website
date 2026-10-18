@@ -159,9 +159,9 @@ club-party-website/
   "project": "元山商校园展示",    // 卡片上的「展示项目」
   "summary": "……",
   "tags": ["元山商", "校园还原", "服务器"],
-  "logo": "/img/clubs/mc-coal/logo.svg",
-  "cover": "/img/clubs/mc-coal/cover.svg",      // images 为空时回落到它
-  "images": ["…/shot-1.svg", "…/shot-2.svg"],   // 1 张时不出缩略图条
+  "logo": "/img/clubs/mc-coal/logo.png",
+  "cover": "/img/clubs/mc-coal/shot-1.jpg",     // images 为空时回落到它
+  "images": ["…/shot-1.jpg", "…/shot-2.jpg"],   // 1 张时不出缩略图条
   "doc": "/docs/clubs/mc-coal"
 }
 ```
@@ -172,7 +172,8 @@ club-party-website/
 
 ### 素材状态
 
-`static/img/clubs/<slug>/` 下目前是两种素材混用，组件会自动区分：
+`static/img/clubs/<slug>/` 下两种素材可以混用，组件会自动区分。2026-10-18 起七个社团都交了真实
+素材（`mc-coal` 最后一家），占位图这套机制留着给以后新增的社团：
 
 | 状态   | 判定方式            | 表现                                              |
 | ---- | --------------- | ----------------------------------------------- |
@@ -180,8 +181,9 @@ club-party-website/
 | 真实素材 | `.jpg` / `.png` | 角标自动消失，改用浏览器默认的平滑缩放                             |
 
 真实照片按「展示宽度 1600px 上限、`-strip` 去掉 EXIF」的标准处理后再入库，**不要**把社团发来的  
-原图直接提交。把某个社团的 `clubs.json` 指向真实文件、再跑一次 `npm run gen:clubs`，  
-对应的详情页文案（「图片待补」提示、alt 文案）会自动跟着变。
+原图直接提交。把某个社团的 `clubs.json` 指向真实文件即可，卡片与画廊自动跟着变；  
+该社团的详情页图片段要手改 —— `npm run gen:clubs` 只补缺失的占位图与还没有的 `.mdx`，  
+不会覆盖已存在的页面（要重生成得加 `--force`）。
 
 ## 站点功能
 
