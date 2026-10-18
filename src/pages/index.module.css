@@ -667,8 +667,8 @@
   text-decoration: none;
 }
 
-/* 「放烟花」按钮里的火箭图标 */
-.celebrateIcon {
+/* hero 按钮里的小图标（放烟花那颗火箭、报名那颗命名牌） */
+.buttonIcon {
   height: 16px;
   width: 16px;
   margin-right: 6px;

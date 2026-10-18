@@ -330,7 +330,7 @@ function HomepageHeader() {
 
         <div className={styles.buttons}>
           <Link className={styles.mcLink} to="/docs/intro">
-            <Button variant="primary">活动说明</Button>
+            <Button variant="secondary">活动说明</Button>
           </Link>
           <Tooltip content="每个社团都有独立展位" placement="bottom">
             <Button variant="secondary" onClick={scrollToClubs}>
@@ -339,10 +339,22 @@ function HomepageHeader() {
           </Tooltip>
           <Tooltip content="再放一轮烟花" placement="bottom">
             <Button variant="secondary" onClick={() => launch(3)}>
-              <img className={styles.celebrateIcon} src="/mc/items/firework_rocket.png" alt="" />
+              <img className={styles.buttonIcon} src="/mc/items/firework_rocket.png" alt="" />
               放烟花
             </Button>
           </Tooltip>
+          {/* 报名入口：同学反馈「找不到报名按钮」，所以在 hero 里补一颗，放在「放烟花」右边。
+              它是这一排**唯一**的主按钮（`primary` = 草绿），其余三颗都是次级灰，不至于四颗绿挤在一起。
+              嵌套用 `Link > Tooltip > Button`：与 `ClubShowcase` 里已验证过的写法一致
+              （Tooltip 要 clone 子元素挂事件和 ref，Link 得在最外层才稳）。 */}
+          <Link className={styles.mcLink} to="/signup">
+            <Tooltip content="填六项 + 一张皮肤，名单上就有你" placement="bottom">
+              <Button variant="primary">
+                <img className={styles.buttonIcon} src="/mc/items/name_tag.png" alt="" />
+                我要报名
+              </Button>
+            </Tooltip>
+          </Link>
         </div>
 
         <dl className={styles.facts}>
