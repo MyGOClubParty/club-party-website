@@ -89,25 +89,18 @@ const config: Config = {
     colorMode: {
       respectPrefersColorScheme: true,
     },
-    // 顶栏公告（Docusaurus 自带，渲染在导航栏**上方**的 `role="banner"` 条）。
-    // - `content` 走 dangerouslySetInnerHTML，可以直接写文字与 emoji。
-    // - **不在这里写 backgroundColor / textColor**：那两个值会以内联样式落在元素上，
-    //   两个主题共用一套颜色，深色页面会突兀。配色改在 src/css/custom.css 里按
-    //   `html[data-theme]` 分主题给（容器类 `.theme-announcement-bar` 是稳定类名）。
-    // - `id` 是「这条公告是不是新的一条」的判据（存在 localStorage）：**改文案就要换 id**。
-    //   这条设了 `isCloseable: false`（关不掉），后缀 `-noclose` 的由来见下。
-    announcementBar: {
-      // `isActive` = 「配置里有公告」**且**「本机那个 dismiss 键不是 true」，而 Docusaurus
-      // 只在 id 变化时才清那个键（announcementBar.js 的 isNewAnnouncement）。所以只要是
-      // **点过 × 的浏览器**，id 不变就永远看不到这条通知 —— 改成 isCloseable:false 也救不回来
-      // （开关只管「有没有 × 可点」，不管「显示不显示」）。带 `-noclose` 后缀是防御性的：
-      // 预览环境里已经点过 × 的同学属于这类，将来若先上线过可关闭版再改成不可关闭，同样靠它复位。
-      id: 'beta-data-wipe-2026-10-17-noclose',
-      content:
-        '⚠️ 公测期间所有功能仅供测试，10月17日正式开始报名前将清空所有测试期间的报名数据！',
-      // 这条通知必须一直看得见（清库时间点），不给关闭入口。
-      isCloseable: false,
-    },
+    // 顶栏公告（Docusaurus 自带，渲染在导航栏**上方**的 `role="banner"` 条）—— **当前关闭**。
+    // 关的原因是内容过期：那条「10 月 17 日清空测试数据」的通知到了 10 月 18 日还挂着，
+    // 只会让人以为正式报名还没开始。关闭方式是**把 `announcementBar` 整个去掉** ——
+    // Docusaurus 的 `isActive` 是内部算出来的（配置里存在这个键 = 有公告，且本机 dismiss
+    // 键不为 true），没有 `isActive: false` 这种字段，写上反而校验不过。
+    //
+    // 将来要挂新通知，从 git 历史取回本段（`bb3cb3a` 之前的版本），注意两点：
+    //   - **改文案必须同时换 `id`**：点过 × 的浏览器本机留着 dismiss=true，id 不变就永远
+    //     看不到这条（`isCloseable: false` 也救不回来 —— 那个开关只管有没有 × 可点）。
+    //   - 配色别写在配置里（`backgroundColor`/`textColor` 会以内联样式盖掉两套主题）。
+    //     按主题给的配色还在 src/css/custom.css 的 `html[data-theme] .theme-announcement-bar`，
+    //     没跟着删，恢复公告时直接生效。
     navbar: {
       title: '山商方块嘉年华',
       logo: {
